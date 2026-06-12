@@ -75,7 +75,7 @@ window.LENA = {
       {
         typ: "Projekt",
         titel: "Der Fotoblog bekommt eine Aufgabe",
-        begruendung: "Weil „mein kleiner Fotoblog, den nur zwölf Leute lesen“ in deiner Antwort auf die Ikigai-Frage auftaucht — er trägt dich also schon. Er braucht kein Publikum, er braucht eine Richtung: deine Island-Reise, die du „seit drei Jahren vor dir herschiebst“, wäre Kapitel eins.",
+        begruendung: "Weil du auf die Frage nach deinem heutigen Ikigai „mein kleiner Fotoblog, den nur zwölf Leute lesen“ geantwortet hast — er trägt dich also schon. Er braucht kein Publikum, er braucht eine Richtung: die Island-Fotoreise, die du „seit drei Jahren vor dir herschiebst“, wäre Kapitel eins.",
         erster_schritt: "Blocke dir noch heute ein Wochenende im Kalender — nicht für Island, für die Recherche dazu."
       }
     ],

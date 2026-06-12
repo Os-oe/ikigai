@@ -225,7 +225,7 @@ async function callGemini(apiKey, model, input) {
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA,
       temperature: 0.55,
-      maxOutputTokens: 4096
+      maxOutputTokens: 16384
     }
   };
   const res = await fetch(url, {
@@ -347,14 +347,14 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Nur POST" });
   if (!originAllowed(req)) return res.status(403).json({ ok: false, error: "Zugriff nur über die Demo-Seite" });
 
-  const apiKey = process.env.GOOGLE_AI_STUDIO || process.env.GOOGLE_AI_STUDIO_KEY;
-  if (!apiKey) return res.status(503).json({ ok: false, fallback: true, error: "Live-Funktion nicht konfiguriert" });
-
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = null; } }
 
   const input = validateInput(body);
   if (input.err) return res.status(400).json({ ok: false, error_user: input.err });
+
+  const apiKey = process.env.GOOGLE_AI_STUDIO || process.env.GOOGLE_AI_STUDIO_KEY;
+  if (!apiKey) return res.status(503).json({ ok: false, fallback: true, error: "Live-Funktion nicht konfiguriert" });
 
   if (capExceeded(req)) {
     return res.status(429).json({ ok: false, fallback: true, error: "Tages-Limit der Live-Demo erreicht" });

@@ -416,6 +416,10 @@
     answerSteps: ANSWER_STEPS,
     next: next, back: back,
     goto: function (i) { state.step = Math.max(0, Math.min(steps.length - 1, i)); render(); },
+    stepInfo: function () {
+      var st = steps[state.step];
+      return { i: state.step, kind: st.kind, id: st.frage ? st.frage.id : (st.item ? st.item.id : (st.block ? st.block.id : "")), type: st.frage ? st.frage.type : "" };
+    },
     start: startWizard,
     synthese: startSynthese,
     prefillLena: function () { prefillLena(); show(elWiz); render(); },
