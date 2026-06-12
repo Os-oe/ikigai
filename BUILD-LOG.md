@@ -38,8 +38,8 @@
 |---|---|---|
 | 1 MVP-Kern | ✅ | PASS — suite.py 2× grün (38/38), Live-Call validiert (52/52 mit --live, gemini-3.5-flash, repaired_quotes 0). Commit 6149383 |
 | 2 Features | ✅ | PASS — Suite 2× grün (46/46): PDF 6 Seiten, Share beide Formate, Cap→Fallback+Badge, Resume, 403/400. Commit 852fe39 |
-| 3 Polish | 🔨 in Arbeit | offen |
-| 4 Ship | ⬜ | offen |
+| 3 Polish | ✅ | PASS — Suite 2× grün (56/56), Mobile 390×844 ohne H-Scroll, Erst-Load 243 KB. Selbst-Urteil: ja, würde ich benutzen — Wortspiel leise (nur Logo-Akzent), Design ruhig, Flow ~10 Min. Commit 51133fc |
+| 4 Ship | 🔨 in Arbeit | offen |
 | 5 Excellence | ⬜ | offen |
 
 ## Protokoll
