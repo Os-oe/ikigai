@@ -40,7 +40,7 @@
 | 2 Features | ✅ | PASS — Suite 2× grün (46/46): PDF 6 Seiten, Share beide Formate, Cap→Fallback+Badge, Resume, 403/400. Commit 852fe39 |
 | 3 Polish | ✅ | PASS — Suite 2× grün (56/56), Mobile 390×844 ohne H-Scroll, Erst-Load 243 KB. Selbst-Urteil: ja, würde ich benutzen — Wortspiel leise (nur Logo-Akzent), Design ruhig, Flow ~10 Min. Commit 51133fc |
 | 4 Ship | ✅ | PASS — live_suite 2× grün (18/18) gegen https://ikigai.demo.osai.solutions inkl. echtem Synthese-Call, Zitate 3/3 wörtlich. GitHub Os-oe/ikigai, Vercel git connect, Domain attached. Commit 9a9c612 |
-| 5 Excellence | 🔨 in Arbeit | offen |
+| 5 Excellence | ✅ | PASS — 10 Schwächen dokumentiert, Top 5 gefixt, Re-Deploy, Suite 2× grün (58/58 lokal) + live_suite 2× grün (18/18) |
 
 ## Protokoll
 
@@ -80,5 +80,12 @@
 
 | Posten | Schätzung | Ist |
 |---|---|---|
-| Gemini Flash Synthese (Tests + Live-E2E) | ~0,02 € | — |
+| Gemini Flash Synthese (Tests + Live-E2E, ~10 Calls) | ~0,02 € | ~0,02 € (budget-guard: 2× 0,01 € verbucht) |
 | Bezahlte Bild-Assets | 0 € | 0 € |
+
+## Abschluss (12.06.2026)
+
+- LIVE: https://ikigai.demo.osai.solutions · Repo https://github.com/Os-oe/ikigai
+- LESSONS.md geschrieben · Sales-Board Lead `lead-mqb92k04ejes` (Sprint `one-prompt-kit-ikigai`, delivered, Demo-Record)
+- Lauf-Status: `agent-studio/.planning/one-prompt/ikigai/RUN-STATUS.md` (inkl. Capture-Hinweise)
+- Alle lokalen Dev-Server beendet.
