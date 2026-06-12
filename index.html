@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ikigAI — Der Ikigai-Generator</title>
+<meta name="description" content="Finde, was dein Leben trägt — beide Ebenen des Ikigai in ~10 Minuten. Persönliches Visual, PDF-Report mit 30-Tage-Plan, ohne Konto, ohne E-Mail.">
+<meta property="og:title" content="ikigAI — Der Ikigai-Generator">
+<meta property="og:description" content="Das berühmte Ikigai-Diagramm ist gar nicht japanisch. Dieser Generator erzählt beide Wahrheiten — und baut dein persönliches Ikigai-Visual. ~10 Min, kein Konto.">
+<meta property="og:image" content="https://ikigai.demo.osai.solutions/assets/img/og.png">
+<meta property="og:url" content="https://ikigai.demo.osai.solutions/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f5f0e6">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/shippori-600.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<!-- ───────────── Resume-Banner ───────────── -->
+<div id="resume-banner" class="resume-banner" hidden>
+  <span>Du warst schon mal hier — weitermachen, wo du warst?</span>
+  <div class="resume-actions">
+    <button id="resume-yes" class="btn btn-small">Weitermachen</button>
+    <button id="resume-no" class="btn btn-small btn-ghost">Neu starten</button>
+  </div>
+</div>
+
+<!-- ───────────── HERO ───────────── -->
+<section id="screen-hero" class="screen screen-hero is-active">
+  <div class="hero-inner">
+    <div class="hero-enso" aria-hidden="true">
+      <svg viewBox="0 0 200 200" class="enso enso-hero">
+        <path class="enso-path" d="M 142 38 A 78 78 0 1 0 168 96" fill="none"/>
+      </svg>
+      <span class="hero-kanji" lang="ja">生き甲斐</span>
+    </div>
+    <h1 class="wordmark">ikig<span class="ai">AI</span></h1>
+    <p class="hero-claim">Finde, was dein Leben trägt —<br>und lass KI dir den Weg freiräumen.</p>
+    <p class="hero-promise">~10 Minuten &nbsp;·&nbsp; kein Konto &nbsp;·&nbsp; kein E-Mail-Zwang &nbsp;·&nbsp; PDF sofort</p>
+    <button id="start-btn" class="btn btn-primary">Los geht’s</button>
+    <p class="hero-privacy">Deine Antworten verlassen den Browser nur für die eine KI-Auswertung<br>und werden nirgendwo gespeichert.</p>
+    <p class="hero-truth">Übrigens: Das berühmte Ikigai-Diagramm ist gar nicht japanisch.<br>Wir erzählen dir beide Wahrheiten — am Ende.</p>
+  </div>
+</section>
+
+<!-- ───────────── WIZARD ───────────── -->
+<section id="screen-wizard" class="screen screen-wizard" hidden>
+  <header class="wizard-head">
+    <div class="progress-enso" aria-hidden="true">
+      <svg viewBox="0 0 48 48">
+        <circle class="pe-track" cx="24" cy="24" r="20"/>
+        <circle class="pe-fill" cx="24" cy="24" r="20" id="progress-circle"/>
+      </svg>
+      <span id="progress-label">1</span>
+    </div>
+    <div class="wizard-head-text">
+      <span id="wizard-block-label" class="wizard-block-label"></span>
+      <span id="wizard-step-label" class="wizard-step-label"></span>
+    </div>
+  </header>
+  <div id="wizard-stage" class="wizard-stage" aria-live="polite"></div>
+  <nav class="wizard-nav">
+    <button id="nav-back" class="btn btn-ghost" type="button">Zurück</button>
+    <button id="nav-next" class="btn btn-primary" type="button">Weiter</button>
+  </nav>
+</section>
+
+<!-- ───────────── WARTE-SCREEN ───────────── -->
+<section id="screen-wait" class="screen screen-wait" hidden>
+  <svg viewBox="0 0 200 200" class="enso enso-wait">
+    <path class="enso-path enso-wait-path" d="M 142 38 A 78 78 0 1 0 168 96" fill="none"/>
+  </svg>
+  <p class="wait-title">Deine Antworten werden verdichtet …</p>
+  <p id="wait-fact" class="wait-fact"></p>
+</section>
+
+<!-- ───────────── ERGEBNIS ───────────── -->
+<section id="screen-result" class="screen screen-result" hidden>
+  <div id="result-root"></div>
+</section>
+
+<!-- ───────────── FOOTER ───────────── -->
+<footer class="site-footer">
+  <div class="footer-brand">
+    <span class="footer-powered">powered by</span>
+    <a href="https://osai.solutions" target="_blank" rel="noopener" class="footer-osai">
+      <img src="assets/img/logo-mark.png" alt="OsAI" width="22" height="18">
+      <span>OsAI</span>
+    </a>
+  </div>
+  <p class="footer-sources">Ikigai-9-Skala: Imai et&nbsp;al. 2012 · Fido, Kotera &amp; Asano 2019 · 5 Säulen: Ken Mogi, <em>The Little Book of Ikigai</em> (2017) · Diagramm-Historie: Zuzunaga 2011 / Winn 2014</p>
+  <nav class="footer-links">
+    <a href="impressum.html">Impressum</a>
+    <a href="datenschutz.html">Datenschutz</a>
+    <a href="https://osai.solutions" target="_blank" rel="noopener">osai.solutions</a>
+  </nav>
+</footer>
+
+<script src="assets/js/questions.js"></script>
+<script src="assets/js/lena.js"></script>
+<script src="assets/js/visual-canvas.js"></script>
+<script src="assets/js/venn.js"></script>
+<script src="assets/js/result.js"></script>
+<script src="assets/js/share.js"></script>
+<script src="assets/js/pdf.js" defer></script>
+<script src="assets/js/wizard.js"></script>
+</body>
+</html>
