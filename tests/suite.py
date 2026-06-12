@@ -169,6 +169,43 @@ try:
         check("Badge sagt: Antworten nicht ausgewertet", "nicht" in pg.locator(".beispiel-badge").inner_text())
         pg.close()
 
+        # ── 2b · Downloads: PDF + Share-Bilder ──
+        print("\n■ 2b · PDF + Share-Bild")
+        pg = browser.new_page()
+        pg.goto("http://127.0.0.1:8982/?demo=1&mock=1&fast=1")
+        pg.wait_for_load_state("networkidle")
+        pg.click("#nav-next")
+        pg.wait_for_selector("#screen-result:not([hidden])", timeout=15000)
+
+        with pg.expect_download(timeout=30000) as dl:
+            pg.click("#btn-pdf")
+        f = dl.value.path()
+        data = open(f, "rb").read()
+        check("PDF lädt herunter, beginnt mit %PDF", data[:4] == b"%PDF")
+        check(f"PDF > 80 KB ({len(data)//1024} KB)", len(data) > 80 * 1024)
+        pages = len(re.findall(rb"/Type\s*/Page\b(?!s)", data))
+        check(f"PDF hat 6 Seiten ({pages})", pages == 6)
+        check("PDF-Dateiname personalisiert", "lena" in dl.value.suggested_filename)
+
+        def png_dims(b):
+            return int.from_bytes(b[16:20], "big"), int.from_bytes(b[20:24], "big")
+        with pg.expect_download(timeout=20000) as dl:
+            pg.click("#btn-share-sq")
+        b = open(dl.value.path(), "rb").read()
+        check(f"Share 1:1 = 1080×1080 ({png_dims(b)})", png_dims(b) == (1080, 1080))
+        check("Share 1:1 ist substanzielles PNG", b[:8] == b"\x89PNG\r\n\x1a\n" and len(b) > 60 * 1024)
+        with pg.expect_download(timeout=20000) as dl:
+            pg.click("#btn-share-story")
+        b = open(dl.value.path(), "rb").read()
+        check(f"Share 9:16 = 1080×1920 ({png_dims(b)})", png_dims(b) == (1080, 1920))
+        # Vorschau-Canvases tatsächlich bemalt?
+        painted = pg.evaluate("""(() => {
+          const c = document.getElementById('share-sq');
+          const d = c.getContext('2d').getImageData(540, 540, 1, 1).data;
+          return d[3] > 0; })()""")
+        check("Share-Vorschau gerendert (Pixel im Zentrum)", painted)
+        pg.close()
+
         # ── 3 · localStorage-Resume ──
         print("\n■ 3 · localStorage-Resume")
         pg = browser.new_page()

@@ -36,8 +36,8 @@
 
 | Phase | Status | Gate |
 |---|---|---|
-| 1 MVP-Kern | 🔨 in Arbeit | offen |
-| 2 Features | ⬜ | offen |
+| 1 MVP-Kern | ✅ | PASS — suite.py 2× grün (38/38), Live-Call validiert (52/52 mit --live, gemini-3.5-flash, repaired_quotes 0). Commit 6149383 |
+| 2 Features | 🔨 in Arbeit | offen |
 | 3 Polish | ⬜ | offen |
 | 4 Ship | ⬜ | offen |
 | 5 Excellence | ⬜ | offen |
@@ -49,6 +49,13 @@
 - 2026-06-12 19:29 — Repo init, Logo kopiert (`assets/img/logo-mark.png`), Fonts
   (Shippori Mincho 500/600/700 latin + Inter var) + jsPDF 2.5.2 self-hosted.
 - 2026-06-12 19:35 — Architektur fixiert (siehe oben), Fragen-Katalog aus RESEARCH §5 kuratiert.
+- 2026-06-12 ~20:15 — ⚠️ Fachliche Korrektur: „OsAI-Orange" existiert nicht — Brand-Akzent ist
+  das Siegelrot `#F6303A` (logo-mark.png + brand-card.json). Als Akzent übernommen (passt
+  zur Hanko-Siegel-Optik des Washi-Designs).
+- 2026-06-12 ~20:45 — Phase 1 komplett. Lessons: (a) Gemini 3.5 Flash braucht maxOutputTokens
+  16k (Thinking-Tokens zählen mit — 4k → abgeschnittenes JSON, 41 s Latenz; ok-Call ~35 s);
+  (b) API-Reihenfolge: Input-Validierung VOR Key-Check, sonst testet der No-Key-Server 503
+  statt 400. Live-Ergebnis-Fixture: /tmp/ikigai-live-result.json. Kosten bisher ~0,01 € (verbucht).
 
 ## Kosten (laufend)
 

@@ -32,11 +32,11 @@
       var cx = cx0 + ci.dx * off, cy = cy0 + ci.dy * off;
       var lx = cx + ci.dx * (r * 0.42), ly = cy + ci.dy * (r * 0.46);
       var terms = (data.kreise && data.kreise[ci.key]) || [];
-      var lines = [{ t: ci.label.toUpperCase(), f: "600 " + Math.round(12 * k) + "px " + SANS, c: ci.color, sp: 1.2 }];
+      var lines = [{ t: ci.label.toUpperCase(), f: "600 " + Math.round(11 * k) + "px " + SANS, c: ci.color, sp: 1.2 }];
       terms.slice(0, 3).forEach(function (t) {
-        lines.push({ t: t, f: "italic 500 " + Math.round(15.5 * k) + "px " + SERIF, c: ink });
+        lines.push({ t: t, f: "italic 500 " + Math.round(14 * k) + "px " + SERIF, c: ink });
       });
-      var lh = 20 * k, startY = ly - ((lines.length - 1) * lh) / 2;
+      var lh = 19 * k, startY = ly - ((lines.length - 1) * lh) / 2;
       lines.forEach(function (ln, i) {
         ctx.font = ln.f; ctx.fillStyle = ln.c;
         ctx.fillText(ln.t, lx, startY + i * lh);
@@ -45,23 +45,24 @@
 
     /* Schnittmengen */
     if (data.schnittmengen) {
-      ctx.font = "italic 500 " + Math.round(12.5 * k) + "px " + SERIF;
+      ctx.font = "italic 500 " + Math.round(11.5 * k) + "px " + SERIF;
       ctx.fillStyle = soft;
       GEO.overlaps.forEach(function (ov) {
         var t = data.schnittmengen[ov.key];
         if (!t) return;
-        var rad = (ov.angle * Math.PI) / 180, d = off * 1.62;
+        var rad = (ov.angle * Math.PI) / 180, d = off * GEO.overlapDist;
         ctx.fillText(t, cx0 + Math.cos(rad) * d, cy0 + Math.sin(rad) * d);
       });
     }
 
     /* Zentrum */
-    var zl = GEO.wrap(data.zentrum || "", 24, 4);
-    var zlh = 22 * k, zy = cy0 - ((zl.length - 1) * zlh) / 2 - 6 * k;
-    ctx.font = "600 " + Math.round(11 * k) + "px " + SANS;
+    var fit = GEO.zentrumFit(data.zentrum);
+    var zl = GEO.wrap(data.zentrum || "", fit.chars, fit.lines);
+    var zlh = fit.lh * k, zy = cy0 - ((zl.length - 1) * zlh) / 2 + 2 * k;
+    ctx.font = "600 " + Math.round(10 * k) + "px " + SANS;
     ctx.fillStyle = "#f6303a";
-    ctx.fillText("I K I G A I", cx0, zy - 28 * k);
-    ctx.font = "600 " + Math.round(17 * k) + "px " + SERIF;
+    ctx.fillText("I K I G A I", cx0, zy - zlh - 8 * k);
+    ctx.font = "600 " + Math.round(fit.size * k) + "px " + SERIF;
     ctx.fillStyle = ink;
     zl.forEach(function (ln, i) { ctx.fillText(ln, cx0, zy + i * zlh); });
   };
