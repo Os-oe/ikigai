@@ -225,6 +225,59 @@ try:
         check("Resume behält Antwort", pg.evaluate("window.__ikig.state.profil.beruf") == "Testerin im Resume-Test")
         pg.close()
 
+        # ── 3b · Mobile-Parität 390×844 ──
+        print("\n■ 3b · Mobile-Parität (390×844)")
+        mob = browser.new_page(viewport={"width": 390, "height": 844},
+                               device_scale_factor=2, is_mobile=True, has_touch=True)
+        mob.goto("http://127.0.0.1:8982/?mock=1&fast=1")
+        mob.wait_for_load_state("networkidle")
+        check("Mobile: kein horizontales Scrollen (Hero)",
+              mob.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
+        mob.tap("#start-btn")
+        mob.fill('input[data-field="name"]', "Lena")
+        mob.fill('input[data-field="beruf"]', "Projektmanagerin in einer Agentur")
+        mob.tap("#nav-next")
+        bb = mob.locator('.likert button[data-v="3"]').bounding_box()
+        check(f"Mobile: Likert-Tap-Target >= 44px ({bb['height']:.0f})", bb and bb["height"] >= 44)
+        mob.tap('.likert button[data-v="3"]')
+        mob.wait_for_timeout(120)
+        check("Mobile: Likert Auto-Advance", mob.evaluate("window.__ikig.stepInfo().id") == "k2")
+        mob.evaluate("window.__ikig.prefillLena()")
+        mob.tap("#nav-next")
+        mob.wait_for_selector("#screen-result:not([hidden])", timeout=15000)
+        check("Mobile: Ergebnis rendert", mob.locator("#venn-wrap svg").count() == 1)
+        check("Mobile: kein horizontales Scrollen (Ergebnis)",
+              mob.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
+        check("Mobile: Kaizen-Spalten gestapelt",
+              mob.evaluate("getComputedStyle(document.querySelector('.kaizen-step')).gridTemplateColumns.split(' ').length") == 1)
+        mob.close()
+
+        # ── 3c · error_user-Pfad (Inhalts-Fehler → zurück in den Wizard) ──
+        print("\n■ 3c · error_user-Pfad")
+        pg = browser.new_page()
+        pg.route("**/api/synthesize", lambda route: route.fulfill(
+            status=422, content_type="application/json",
+            body=json.dumps({"ok": False, "error_user": "Ein paar Antworten sind zu knapp für eine ehrliche Auswertung."})))
+        pg.goto("http://127.0.0.1:8982/?demo=1&fast=1")
+        pg.wait_for_load_state("networkidle")
+        pg.click("#nav-next")
+        pg.wait_for_selector("#screen-wizard:not([hidden])", timeout=15000)
+        check("error_user: zurück im Wizard statt Fehlerbildschirm", pg.locator("#screen-result").is_hidden())
+        check("error_user: Hinweis sichtbar", "ehrliche Auswertung" in pg.locator(".q-error").inner_text())
+        pg.close()
+
+        # ── 3d · Erst-Load-Gewicht ──
+        print("\n■ 3d · Ladegewicht")
+        pg = browser.new_page()
+        sizes = []
+        pg.on("response", lambda r: sizes.append((r.url.split("/")[-1] or r.url, len(r.body()) if r.ok else 0)))
+        pg.goto("http://127.0.0.1:8982/?fast=1")
+        pg.wait_for_load_state("networkidle")
+        total = sum(s for _, s in sizes)
+        check(f"Erst-Load < 350 KB ({total//1024} KB, {len(sizes)} Requests)", total < 350 * 1024)
+        check("jsPDF NICHT im Erst-Load", not any("jspdf" in u for u, _ in sizes))
+        pg.close()
+
         browser.close()
 
     # ── 4 · API-Schutzschicht (ohne LLM-Verbrauch) ──

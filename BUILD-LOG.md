@@ -37,8 +37,8 @@
 | Phase | Status | Gate |
 |---|---|---|
 | 1 MVP-Kern | ✅ | PASS — suite.py 2× grün (38/38), Live-Call validiert (52/52 mit --live, gemini-3.5-flash, repaired_quotes 0). Commit 6149383 |
-| 2 Features | 🔨 in Arbeit | offen |
-| 3 Polish | ⬜ | offen |
+| 2 Features | ✅ | PASS — Suite 2× grün (46/46): PDF 6 Seiten, Share beide Formate, Cap→Fallback+Badge, Resume, 403/400. Commit 852fe39 |
+| 3 Polish | 🔨 in Arbeit | offen |
 | 4 Ship | ⬜ | offen |
 | 5 Excellence | ⬜ | offen |
 
