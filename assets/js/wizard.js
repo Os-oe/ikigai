@@ -51,7 +51,23 @@
       return s;
     } catch (e) { return null; }
   }
-  function clearSaved() { try { localStorage.removeItem(LS_KEY); } catch (e) {} }
+  function clearSaved() { try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_RESULT); } catch (e) {} }
+
+  var LS_RESULT = "ikigai-result-v1";
+  function saveResult(ergebnis, ctx) {
+    try {
+      localStorage.setItem(LS_RESULT, JSON.stringify({
+        ergebnis: ergebnis, beispiel: !!ctx.beispiel,
+        profil: ctx.profil, ikigai9: ctx.ikigai9, ts: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function loadResult() {
+    try {
+      var r = JSON.parse(localStorage.getItem(LS_RESULT) || "null");
+      return r && r.ergebnis ? r : null;
+    } catch (e) { return null; }
+  }
 
   /* ---------- DOM ---------- */
   var $ = function (sel) { return document.querySelector(sel); };
@@ -130,7 +146,7 @@
 
   function err(card, msg) {
     var e = card.querySelector(".q-error");
-    if (e) e.textContent = msg || "";
+    if (e) { e.setAttribute("role", "status"); e.textContent = msg || ""; }
   }
 
   /* Profil */
@@ -158,16 +174,16 @@
     var html = '<p class="q-dim">' + st.item.dimName + "</p>" +
       '<p class="q-prompt">' + st.item.text + "</p>" + '<div class="likert">';
     F.likertLabels.forEach(function (label, i) {
-      var sel = state.ikigai9[st.idx] === i + 1 ? " sel" : "";
-      html += '<button type="button" class="' + sel.trim() + '" data-v="' + (i + 1) + '">' +
-        '<span class="dot"></span>' + label + "</button>";
+      var isSel = state.ikigai9[st.idx] === i + 1;
+      html += '<button type="button" class="' + (isSel ? "sel" : "") + '" data-v="' + (i + 1) +
+        '" aria-pressed="' + isSel + '">' + '<span class="dot"></span>' + label + "</button>";
     });
     html += "</div>" + '<p class="q-error"></p>';
     card.innerHTML = html;
     card.querySelectorAll(".likert button").forEach(function (b) {
       b.addEventListener("click", function () {
-        card.querySelectorAll(".likert button").forEach(function (x) { x.classList.remove("sel"); });
-        b.classList.add("sel");
+        card.querySelectorAll(".likert button").forEach(function (x) { x.classList.remove("sel"); x.setAttribute("aria-pressed", "false"); });
+        b.classList.add("sel"); b.setAttribute("aria-pressed", "true");
         state.ikigai9[st.idx] = Number(b.dataset.v);
         save(); updateProgress();
         setTimeout(next, FAST ? 10 : 280); /* Auto-Advance */
@@ -208,8 +224,9 @@
       var selVals = state.antworten[f.id] || [];
       html += '<div class="chips">';
       f.options.forEach(function (opt) {
-        html += '<button type="button" class="chip' + (selVals.indexOf(opt) >= 0 ? " sel" : "") +
-          '">' + opt + "</button>";
+        var isSel = selVals.indexOf(opt) >= 0;
+        html += '<button type="button" class="chip' + (isSel ? " sel" : "") +
+          '" aria-pressed="' + isSel + '">' + opt + "</button>";
       });
       html += "</div>";
       if (f.customAllowed) {
@@ -236,6 +253,7 @@
             }
           }
           c.classList.toggle("sel");
+          c.setAttribute("aria-pressed", c.classList.contains("sel") ? "true" : "false");
           state.antworten[f.id] = current();
           err(card, ""); save(); updateProgress();
         });
@@ -323,19 +341,27 @@
     show(elWait); startWaitFacts();
     var t0 = Date.now();
     var minWait = FAST ? 0 : 2600;
+    var waitTitle = $(".wait-title");
+    waitTitle.textContent = "Deine Antworten werden verdichtet …";
+    var longTimer = setTimeout(function () {
+      waitTitle.textContent = "Dauert gerade etwas länger — die KI liest deine Antworten gründlich.";
+    }, 18000);
 
     function finish(ergebnis, istBeispiel) {
       var rest = Math.max(0, minWait - (Date.now() - t0));
+      clearTimeout(longTimer);
       setTimeout(function () {
         stopWaitFacts();
         state.done = true; save();
         window.__ikig.lastResult = ergebnis;
-        window.IKIGAI_RESULT.render(ergebnis, {
+        var ctx = {
           beispiel: istBeispiel,
           profil: istBeispiel ? window.LENA.profil : state.profil,
           ikigai9: istBeispiel ? window.LENA.ikigai9 : state.ikigai9,
           fast: FAST
-        });
+        };
+        if (!istBeispiel && !MOCK) saveResult(ergebnis, ctx);
+        window.IKIGAI_RESULT.render(ergebnis, ctx);
         show(elResult);
       }, rest);
     }
@@ -351,7 +377,7 @@
         if (r.j && r.j.ok && r.j.ergebnis) { finish(r.j.ergebnis, false); return; }
         if (r.j && r.j.error_user) {
           /* strukturierter Inhalts-Fehler: zurück in den Wizard, sanfter Hinweis */
-          stopWaitFacts(); show(elWiz);
+          clearTimeout(longTimer); stopWaitFacts(); show(elWiz);
           var card = stage.firstChild;
           if (card) err(card, r.j.error_user);
           return;
@@ -379,9 +405,26 @@
   $("#start-btn").addEventListener("click", startWizard);
 
   var saved = !DEMO && load();
+  var savedResult = !DEMO && !MOCK && loadResult();
   if (DEMO) {
     prefillLena();
     show(elWiz); render();
+  } else if (savedResult && saved && saved.done) {
+    /* fertiges Ergebnis liegt vor → wieder öffnen anbieten */
+    banner.hidden = false;
+    banner.querySelector("span").textContent = "Dein Ergebnis ist noch da — wieder öffnen?";
+    $("#resume-yes").textContent = "Ergebnis öffnen";
+    $("#resume-yes").addEventListener("click", function () {
+      banner.hidden = true;
+      window.IKIGAI_RESULT.render(savedResult.ergebnis, {
+        beispiel: savedResult.beispiel, profil: savedResult.profil,
+        ikigai9: savedResult.ikigai9, fast: FAST
+      });
+      show(elResult);
+    });
+    $("#resume-no").addEventListener("click", function () {
+      clearSaved(); state = freshState(); banner.hidden = true;
+    });
   } else if (saved && saved.started && !saved.done && (saved.step > 0 || answeredOf(saved) > 0)) {
     banner.hidden = false;
     $("#resume-yes").addEventListener("click", function () {

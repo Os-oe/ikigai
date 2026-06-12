@@ -156,6 +156,7 @@
       d.setFont("times", "bold"); d.setFontSize(12);
       d.setTextColor(INK[0], INK[1], INK[2]);
       d.text(e.titel, M, D.y); D.y += 6;
+      d.setFont("times", "italic"); /* korrekte Metrik für die Balken-Höhe */
       var qh = measure(d, "Du hast geschrieben: „" + e.zitat + "“", 10, PW - 2 * M - 10);
       d.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2]);
       d.rect(M, D.y - 3.6, 1, qh + 2, "F");

@@ -39,8 +39,8 @@
 | 1 MVP-Kern | ✅ | PASS — suite.py 2× grün (38/38), Live-Call validiert (52/52 mit --live, gemini-3.5-flash, repaired_quotes 0). Commit 6149383 |
 | 2 Features | ✅ | PASS — Suite 2× grün (46/46): PDF 6 Seiten, Share beide Formate, Cap→Fallback+Badge, Resume, 403/400. Commit 852fe39 |
 | 3 Polish | ✅ | PASS — Suite 2× grün (56/56), Mobile 390×844 ohne H-Scroll, Erst-Load 243 KB. Selbst-Urteil: ja, würde ich benutzen — Wortspiel leise (nur Logo-Akzent), Design ruhig, Flow ~10 Min. Commit 51133fc |
-| 4 Ship | 🔨 in Arbeit | offen |
-| 5 Excellence | ⬜ | offen |
+| 4 Ship | ✅ | PASS — live_suite 2× grün (18/18) gegen https://ikigai.demo.osai.solutions inkl. echtem Synthese-Call, Zitate 3/3 wörtlich. GitHub Os-oe/ikigai, Vercel git connect, Domain attached. Commit 9a9c612 |
+| 5 Excellence | 🔨 in Arbeit | offen |
 
 ## Protokoll
 
@@ -56,6 +56,25 @@
   16k (Thinking-Tokens zählen mit — 4k → abgeschnittenes JSON, 41 s Latenz; ok-Call ~35 s);
   (b) API-Reihenfolge: Input-Validierung VOR Key-Check, sonst testet der No-Key-Server 503
   statt 400. Live-Ergebnis-Fixture: /tmp/ikigai-live-result.json. Kosten bisher ~0,01 € (verbucht).
+
+## Excellence-Pass — 10 Schwächen (Phase 5)
+
+1. **Ergebnis nicht wieder öffenbar** — nach Reload landet man auf dem Hero, das Ergebnis
+   ist weg (nicht persistiert). Größte echte UX-Lücke. → **FIX (Top 1)**
+2. **Lange Synthese-Wartezeit ohne Eskalations-Feedback** — echter Call 26–35 s
+   (Gemini-3.5-Thinking); nach ~18 s wirkt es wie hängen. → **FIX (Top 2)**:
+   Warte-Titel wechselt nach 18 s („dauert gerade etwas länger — die KI liest gründlich").
+3. **A11y**: Likert/Chips ohne `aria-pressed`, Fehlerzeile ohne `role=status`. → **FIX (Top 3)**
+4. **PDF: rote Zitat-Balken-Höhe** wird mit falscher Font gemessen (times-bold statt
+   times-italic) → Balken zu kurz bei mehrzeiligen Zitaten. → **FIX (Top 4)**
+5. **og.png 330 KB** — Palette-Optimierung auf ~120 KB. → **FIX (Top 5)**
+6. Synthese-Latenz selbst (Thinking nicht abschaltbar ohne Risiko in der Modell-Kette) —
+   akzeptiert, durch Fix 2 + Ensō-Loop + Fakten abgefedert. NOTIERT
+7. Share 9:16 hat ruhige Leerzone 1560–1780 px — bewusst japanisch-minimal belassen. NOTIERT
+8. In-Memory-Caps pro Function-Instanz — dokumentierter Kompromiss (Pattern-Entscheid). NOTIERT
+9. Score-Ring animiert auch unterhalb des Folds (rAF statt IO) — kosmetisch. NOTIERT
+10. Wortspiel-Lautstärke geprüft: nur Logo-Akzent + ein Hero-Halbsatz + Kaizen-Spalte —
+    leise genug, keine Änderung nötig. NOTIERT
 
 ## Kosten (laufend)
 

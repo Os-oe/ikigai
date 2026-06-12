@@ -266,6 +266,28 @@ try:
         check("error_user: Hinweis sichtbar", "ehrliche Auswertung" in pg.locator(".q-error").inner_text())
         pg.close()
 
+        # ── 3e · Ergebnis-Persistenz (wieder öffnen nach Reload) ──
+        print("\n■ 3e · Ergebnis wieder öffnen")
+        lena_erg = json.loads(subprocess.run(["node", "-e",
+            "global.window={};" + open(os.path.join(ROOT, "assets/js/lena.js"), encoding="utf-8").read() +
+            ";console.log(JSON.stringify(window.LENA.ergebnis))"], capture_output=True, text=True).stdout)
+        pg = browser.new_page()
+        pg.route("**/api/synthesize", lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"ok": True, "ergebnis": lena_erg})))
+        pg.goto("http://127.0.0.1:8982/?demo=1&fast=1")
+        pg.wait_for_load_state("networkidle")
+        pg.click("#nav-next")
+        pg.wait_for_selector("#screen-result:not([hidden])", timeout=15000)
+        pg.goto("http://127.0.0.1:8982/?fast=1")  # Reload ohne demo-Param
+        pg.wait_for_load_state("networkidle")
+        check("Reopen-Banner nach Reload", pg.locator("#resume-banner:not([hidden])").count() == 1
+              and "wieder öffnen" in pg.locator("#resume-banner span").first.inner_text())
+        pg.click("#resume-yes")
+        pg.wait_for_selector("#screen-result:not([hidden])", timeout=8000)
+        check("Ergebnis wieder geöffnet (Visual da)", pg.locator("#venn-wrap svg").count() == 1)
+        pg.close()
+
         # ── 3d · Erst-Load-Gewicht ──
         print("\n■ 3d · Ladegewicht")
         pg = browser.new_page()
