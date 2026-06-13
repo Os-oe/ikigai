@@ -88,20 +88,30 @@
       return { x: bx + ci.dx * (r * 0.72), y: by + ci.dy * (r * 0.82) };
     }
 
-    /* Breiten-Budget je Label-Block (zentriert): die schmalste Hälfte zwischen
-     * Anker und dem nächstgelegenen harten Rand (viewBox-Kante mit Gutter bzw.
-     * Zentrum-Plakette). Damit überschreitet KEIN Label — auch sehr lange/
-     * unbrechbare Wörter — die viewBox oder läuft ins Zentrum. */
+    /* Breiten-Budget je Label-Block (zentriert). Zwei harte Schranken, kleinere gewinnt:
+     *  (a) FUSSABDRUCK des eigenen Kreises — ein Label gehört zu EINEM Kreis und darf
+     *      optisch nie breiter werden als dieser Kreis (Review-P1: lange Wörter liefen
+     *      bis fast an die Canvas-Kante, weil das alte Budget bis zur viewBox reichte).
+     *  (b) Abstand zu den harten Rändern (viewBox-Gutter bzw. Zentrum-Plakette), damit
+     *      seitliche Labels weder ins Zentrum noch aus dem Bild laufen.
+     * KEIN großzügiger Floor mehr — der Floor war das eigentliche Leck. */
+    var FOOT = 2 * r * 0.92;                             // Kreis-Fußabdruck (≈ Durchmesser)
     function budget(ci, ax) {
-      if (ci.dx === 0) return vbw - 48;                  // oben/unten: fast volle Breite
+      if (ci.dx === 0) return FOOT;                      // oben/unten: auf den Kreis begrenzt
       var leftEdge = -padX + 24, rightEdge = GEO.vb + padX - 24;
       var plL = cx - 56, plR = cx + 56;                  // Plaketten-Sperrzone
       var half = ci.dx < 0
         ? Math.min(ax - leftEdge, plL - ax)              // links
         : Math.min(rightEdge - ax, ax - plR);            // rechts
-      return Math.max(2 * half, 90);
+      /* Seiten-Labels sitzen am äußeren Kreis-Flank (Anker um r·0.72 nach außen
+       * versetzt) → sie würden bei vollem FOOT nach außen über den Kreis ragen.
+       * Engere Schranke: 1.5·r (≈ sichtbarer Kreis-Abschnitt am Anker). */
+      return Math.min(2 * half, r * 1.5);
     }
-    /* grobe Breiten-Schätzung (px) für conditional textLength-Stauchung */
+    /* Breiten-Schätzung (px) je Zeichen. Konservativ hoch angesetzt: die alten
+     * 9.2/7.2 px unterschätzten breite Glyphen (W/M/ß) + das Versalien-Tracking,
+     * sodass textLength gar nicht erst griff. Lieber leicht überschätzen → eher
+     * stauchen als überlaufen. */
     function estW(text, perChar) { return String(text).length * perChar; }
     /* gibt das textLength/lengthAdjust-Attribut zurück, NUR wenn nötig (sonst leer,
      * damit kurze Labels nicht künstlich gestreckt werden). */
@@ -147,15 +157,18 @@
       var terms = (data.kreise && data.kreise[ci.key]) || [];
       svg += '<g class="venn-t" text-anchor="middle">';
       svg += '<text class="v-kanji" x="' + a.x + '" y="' + (a.y - 30) + '">' + A.KANJI[ci.key] + '</text>';
-      /* Versalien-Label (mit Tracking) — bei Überlänge auf das Budget stauchen */
+      /* Versalien-Label (mit Tracking) — bei Überlänge auf das Budget stauchen.
+       * per-Char konservativ HOCH: Versal-Inter 13px ≈ 8px Glyph + .32em (≈4.2px)
+       * Tracking → ~12px/Char; Begriffe (gemischt, kein Tracking) ~7.6px; Kursiv-
+       * Mincho-Cap ~6.2px. Lieber knapp überschätzen → eher stauchen als überlaufen. */
       svg += '<text class="v-label" x="' + a.x + '" y="' + (a.y - 8) + '"' +
-        clampAttr(ci.label, 9.2, bud) + '>' + esc(ci.label) + '</text>';
+        clampAttr(ci.label, 12, bud) + '>' + esc(ci.label) + '</text>';
       terms.slice(0, 3).forEach(function (t, k) {
         svg += '<text class="v-term" x="' + a.x + '" y="' + (a.y + 12 + k * 17) + '"' +
-          clampAttr(t, 7.2, bud) + '>' + esc(t) + '</text>';
+          clampAttr(t, 7.6, bud) + '>' + esc(t) + '</text>';
       });
       svg += '<text class="v-cap" x="' + a.x + '" y="' + (a.y + 12 + Math.min(terms.length, 3) * 17 + 4) + '"' +
-        clampAttr(A.FARBNAMEN[ci.key], 5.6, bud) + '>' + esc(A.FARBNAMEN[ci.key]) + '</text>';
+        clampAttr(A.FARBNAMEN[ci.key], 6.2, bud) + '>' + esc(A.FARBNAMEN[ci.key]) + '</text>';
       svg += '</g>';
     });
 

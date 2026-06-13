@@ -104,14 +104,20 @@
     /* Breiten-Budget je Label-Block (zentriert): die schmalste Hälfte zwischen
      * Anker und nächstem harten Rand (Cluster-Außenkante bzw. Zentrum-Plakette).
      * Lange/unbrechbare Wörter werden gestaucht statt über die Kreise zu laufen. */
+    /* Identische Schranken wie venn.js budget() (Brief §2: SVG + Canvas pixel-nah
+     * gleich). Ein Label gehört zu EINEM Kreis und wird auf dessen Fußabdruck
+     * begrenzt — nie auf die Clusterbreite (sonst liefen lange Wörter wie im
+     * Review weit über ihren Kreis hinaus). KEIN großzügiger Floor. */
     var plHalf = 56 * k;                                  // Plaketten-Sperrzone (halb)
+    var FOOT = 2 * r * 0.92;                              // Kreis-Fußabdruck (≈ Durchmesser)
     function labelBudget(ci, ax) {
-      if (ci.dx === 0) return 2 * (r + off) * 0.96;        // oben/unten: volle Clusterbreite
+      if (ci.dx === 0) return FOOT;                        // oben/unten: auf den Kreis begrenzt
       var outerHalf = (r + off) * 0.98;                    // bis Cluster-Außenkante
       var half = ci.dx < 0
         ? Math.min(ax - (cx0 - outerHalf), (cx0 - plHalf) - ax)
         : Math.min((cx0 + outerHalf) - ax, ax - (cx0 + plHalf));
-      return Math.max(2 * half, 80 * k);
+      /* Seiten-Labels am äußeren Flank → engere Schranke r·1.5 (wie SVG) */
+      return Math.min(2 * half, r * 1.5);
     }
     GEO.circles.forEach(function (ci) {
       var cx = cx0 + ci.dx * off, cy = cy0 + ci.dy * off;
