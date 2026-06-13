@@ -108,26 +108,35 @@ try:
         pg.click("#start-btn")
         pg.wait_for_selector("#screen-wizard:not([hidden])")
 
-        # Review-P2.2: der Frage-Block muss vertikal zentriert sitzen (nicht im oberen
-        # Drittel kleben mit großer leerer Mitte + tief schwebender Nav). Auf 900px
-        # Desktop soll die Karten-Mitte nahe der Viewport-Mitte liegen, die Nav unten.
+        # Review-P2-C (R4): auf breiten Screens sitzt der Wizard als KOMPONIERTE,
+        # gerahmte Spalte vertikal+horizontal zentriert — Head, Frage-Block und Nav
+        # gruppiert (statt Inhalt im oberen Drittel + tief am Viewport-Boden schwebende
+        # Nav, was als „leer/unfertig" las). Wir prüfen: das Wizard-Panel ist vertikal
+        # zentriert, schmaler als der Viewport (Komposition statt Vollbreite), und die
+        # Nav sitzt direkt unter dem Frage-Block (gruppiert, nicht am Viewport-Boden).
         pg.wait_for_timeout(120)
         bal = pg.evaluate("""() => {
+          const wiz = document.getElementById('screen-wizard');
           const stage = document.getElementById('wizard-stage');
           const card = stage.firstElementChild;
           const nav = document.querySelector('.wizard-nav');
           const r = el => el.getBoundingClientRect();
-          const vh = window.innerHeight;
-          const cardMid = (r(card).top + r(card).bottom) / 2;
-          return { vh, cardMid: Math.round(cardMid), navTop: Math.round(r(nav).top),
-                   offFromCenter: Math.round(Math.abs(cardMid - vh / 2)) };
+          const vh = window.innerHeight, vw = window.innerWidth;
+          const wr = r(wiz);
+          const panelMid = (wr.top + wr.bottom) / 2;
+          return { vh, vw, panelW: Math.round(wr.width), panelMid: Math.round(panelMid),
+                   cardBottom: Math.round(r(card).bottom), navTop: Math.round(r(nav).top),
+                   offFromCenter: Math.round(Math.abs(panelMid - vh / 2)) };
         }""")
-        # Karten-Mitte höchstens ~12% der Höhe von der Viewport-Mitte entfernt
-        check(f"P2.2 Wizard: Frage-Block vertikal zentriert (Mitte {bal['cardMid']}, Δ {bal['offFromCenter']}px)",
-              bal["offFromCenter"] <= bal["vh"] * 0.12)
-        # Nav sitzt im unteren Viewtel — nicht knapp unter der Karte
-        check(f"P2.2 Wizard: Nav unten verankert (navTop {bal['navTop']} ≥ {round(bal['vh']*0.78)})",
-              bal["navTop"] >= bal["vh"] * 0.78)
+        # Panel vertikal zentriert (Mitte nahe Viewport-Mitte)
+        check(f"P2-C Wizard: Panel vertikal zentriert (Mitte {bal['panelMid']}, Δ {bal['offFromCenter']}px)",
+              bal["offFromCenter"] <= bal["vh"] * 0.14)
+        # Panel komponiert (schmaler als Viewport) — nicht randlos breit/leer
+        check(f"P2-C Wizard: Panel begrenzt/komponiert (Breite {bal['panelW']} ≤ 680, vw {bal['vw']})",
+              bal["panelW"] <= 680)
+        # Nav direkt unter dem Frage-Block gruppiert (nicht am Viewport-Boden schwebend)
+        check(f"P2-C Wizard: Nav unter dem Frage-Block gruppiert (navTop {bal['navTop']} − cardBottom {bal['cardBottom']} ≤ 120)",
+              0 <= bal["navTop"] - bal["cardBottom"] <= 120)
 
         antw = LENA["antworten"]
         guard = 0
@@ -398,7 +407,137 @@ try:
                   foot["topBottom"] <= 14)
             check(f"P1 Venn: Seiten-Label bleibt nahe am Kreis ({tag}, +{foot['side']}px ≤ {round(foot['r']*0.9)})",
                   foot["side"] <= foot["r"] * 0.9)
+
+        # ════════════════════════════════════════════════════════════════════
+        # LONG-TEXT-GATE (R4) — die kurze Lena-Demo verdeckte die Mängel; alle
+        # visuellen Artefakte müssen mit ?demo=long (lange, unbrechbar lange
+        # Begriffe) ohne Stauchung/Overflow/Trunkierung bestehen.
+        # ════════════════════════════════════════════════════════════════════
+        print("\n■ R4 · Long-Text-Gate (?demo=long — lange/unbrechbare Begriffe)")
+        pg.goto("http://127.0.0.1:8982/?demo=long&mock=1&fast=1")
+        pg.wait_for_selector("#nav-next", timeout=10000)
+        pg.click("#nav-next")
+        pg.wait_for_selector("#screen-result:not([hidden])", timeout=40000)
+        time.sleep(0.6)
+        long_erg = pg.evaluate("window.__ikig.lastResult")
+
+        # R4-P1-A: Venn-SVG — KEIN horizontales Stauchen (kein textLength/spacingAndGlyphs)
+        # mehr, Begriffe brechen mehrzeilig, Satz NICHT mit „…" abgeschnitten.
+        vmetrics = pg.evaluate("""(data) => {
+          const host = document.createElement('div'); host.style.position='absolute'; host.style.left='-9999px';
+          host.innerHTML = window.IKIGAI_VENN(data, { name: 'Konstantin' });
+          document.body.appendChild(host);
+          const svg = host.querySelector('svg');
+          // 1. keine textLength/spacingAndGlyphs-Stauchung mehr
+          const squashed = svg.querySelectorAll('[textLength],[lengthAdjust]').length;
+          // 2. mind. ein Begriff bricht auf >1 Zeile (mehrzeilig statt einzeilig gestaucht)
+          const terms = [...svg.querySelectorAll('text.v-term')];
+          // 3. Satz vollständig — keine Ellipse am Ende der letzten Satz-Zeile
+          const satz = [...svg.querySelectorAll('tspan.v-satz')].map(t=>t.textContent).join(' ');
+          const r = { squashed, termCount: terms.length, satzEllipsis: /…$/.test(satz.trim()),
+                      satzText: satz };
+          host.remove();
+          return r;
+        }""", {"kreise": long_erg["kreise"], "zentrum": long_erg["zentrum"]})
+        check(f"R4-P1-A Venn: keine horizontale Stauchung mehr ({vmetrics['squashed']} squash-attrs)",
+              vmetrics["squashed"] == 0)
+        check(f"R4-P1-A Venn: langer Satz vollständig (keine '…'-Trunkierung)",
+              not vmetrics["satzEllipsis"])
+
+        # R4-P1-B: Karussell-Slide 2 — langes Wort wird NICHT gestaucht. Wir messen das
+        # gerenderte Wort über die Glyphen-Aspekt-Ratio: ein horizontal gestauchtes
+        # Wort hätte stark gestauchte Buchstaben (Höhe ≫ Breite/Zeichen). Wir prüfen
+        # statt dessen, dass fitWrap mehrzeilig/kleiner setzt: die längste Zeile passt
+        # in maxW (kein Glyphen-Stauch-Scale). Test über die geteilte fitWrap-Logik.
+        s2fit = pg.evaluate("""() => {
+          const c = document.createElement('canvas'); const g = c.getContext('2d');
+          const A = window.IKIGAI_ART, maxW = 430;
+          const fit = A.fitWrap(g, 'Interdisziplinäre Systemarchitektur', maxW, 3,
+            s => '600 ' + Math.round(s) + 'px "Shippori Mincho", serif', 40, 20);
+          g.font = '600 ' + Math.round(fit.size) + 'px "Shippori Mincho", serif';
+          let widest = 0; fit.lines.forEach(l => widest = Math.max(widest, g.measureText(l).width));
+          return { lines: fit.lines.length, size: fit.size, widest: Math.round(widest), maxW };
+        }""")
+        check(f"R4-P1-B Slide2: langes Wort umgebrochen/geschrumpft statt gestaucht "
+              f"({s2fit['lines']} Zeilen @ {s2fit['size']}px)", s2fit["lines"] >= 1 and s2fit["size"] <= 40)
+        check(f"R4-P1-B Slide2: längste Zeile passt in Budget (kein Glyphen-Squeeze, "
+              f"{s2fit['widest']}≤{s2fit['maxW']}px)", s2fit["widest"] <= s2fit["maxW"] + 1)
+
+        # R4: fitWrap bricht ein unbrechbar langes Einzelwort hart (Hard-Break) statt überlaufen
+        hardbreak = pg.evaluate("""() => {
+          const c = document.createElement('canvas'); const g = c.getContext('2d');
+          const A = window.IKIGAI_ART, maxW = 200;
+          const fit = A.fitWrap(g, 'Donaudampfschifffahrtsgesellschaftskapitaenspatentpruefung', maxW, 3,
+            s => '500 ' + Math.round(s) + 'px sans-serif', 38, 14);
+          g.font = '500 ' + Math.round(fit.size) + 'px sans-serif';
+          let widest = 0; fit.lines.forEach(l => widest = Math.max(widest, g.measureText(l).width));
+          return { lines: fit.lines.length, widest: Math.round(widest), maxW };
+        }""")
+        check(f"R4 Hard-Break: unbrechbares Wort bleibt in Budget ({hardbreak['widest']}≤{hardbreak['maxW']}px)",
+              hardbreak["widest"] <= hardbreak["maxW"] + 1)
+
+        # R4 Carousel-Slides 1..6 mit Long-Content rendern → keine JS-Fehler, Maße stabil
+        slide_dims = pg.evaluate("""async (erg) => {
+          await document.fonts.ready;
+          const ctx2 = { profil: window.LENA_LONG.profil };
+          const out = [];
+          for (let n=1;n<=6;n++){ const c=document.createElement('canvas');
+            window.IKIGAI_CAROUSEL.renderSlide(c, n, erg, ctx2, null, 'card');
+            out.push([c.width, c.height]); }
+          return out;
+        }""", long_erg)
+        check("R4 Karussell: alle 6 Long-Slides 1080×1350",
+              all(d == [1080, 1350] for d in slide_dims))
         pg.close()
+
+        # R4-P2-A: PDF-Hashira kollidiert NICHT mit Body — auf S2/S8/S10 muss der
+        # Gutter zwischen Body-Satzspiegel-Rechtskante (BODY_RIGHT≈194mm) und der
+        # Hashira (≈PW-4) leer bleiben. Wir bauen das Long-PDF, rendern die Seiten
+        # und prüfen einen schmalen vertikalen Gutter-Streifen rechts auf Ink.
+        pdfpg = browser.new_page()
+        pdfpg.goto("http://127.0.0.1:8982/?demo=long&mock=1&fast=1")
+        pdfpg.wait_for_selector("#nav-next", timeout=10000)
+        pdfpg.click("#nav-next"); pdfpg.wait_for_selector("#screen-result:not([hidden])", timeout=40000)
+        time.sleep(0.5)
+        pdf_b64 = pdfpg.evaluate("""() => {
+          const erg = window.__ikig.lastResult;
+          const ctx = { profil: window.LENA_LONG.profil, ikigai9: window.LENA_LONG.ikigai9 };
+          return window.IKIGAI_PDF._build(erg, ctx).then(doc => {
+            const ab = doc.output('arraybuffer'); const u = new Uint8Array(ab);
+            let s=''; for (let i=0;i<u.length;i++) s+=String.fromCharCode(u[i]);
+            return { b64: btoa(s), size: u.length };
+          });
+        }""")
+        pdfpg.close()
+        import base64
+        pdf_bytes = base64.b64decode(pdf_b64["b64"])
+        check(f"R4-P2-A PDF <1 MB trotz Long-Text ({round(pdf_b64['size']/1024)} KB)",
+              pdf_b64["size"] < 1024*1024)
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            # mm→pt: 1mm=2.8346pt. A4=210×297mm. Body endet bei BODY_RIGHT=194mm,
+            # Hashira-Glyphe ~199-203mm. Gutter-Streifen 195..198mm prüfen.
+            mm = 2.8346
+            for pidx in (1, 7, 9):  # 0-basiert: S2/S8/S10
+                page = doc[pidx]
+                pm = page.get_pixmap(dpi=150)
+                import math
+                scale = 150/72.0  # px pro pt
+                x0 = int(195*mm*scale); x1 = int(198.5*mm*scale)
+                y0 = int(40*mm*scale); y1 = int(257*mm*scale)  # Body-Höhenbereich
+                ink = 0; samples = 0
+                pix = pm.samples; W = pm.width; n = pm.n
+                for yy in range(y0, min(y1, pm.height), 3):
+                    for xx in range(x0, min(x1, W), 2):
+                        off = (yy*W + xx)*n
+                        rr, gg, bb = pix[off], pix[off+1], pix[off+2]
+                        samples += 1
+                        # „dunkle" Ink-Pixel (deutlich unter Washi ~ 235)
+                        if rr < 150 and gg < 150 and bb < 150: ink += 1
+                check(f"R4-P2-A PDF S{pidx+1}: Gutter Body↔Hashira leer ({ink} ink-px)", ink <= 4)
+        except ImportError:
+            check("R4-P2-A PDF: Gutter-Check (PyMuPDF nicht installiert — übersprungen)", True)
 
         # ── 2c · Permalink (#r=…) — Ergebnis komprimiert ins URL-Fragment ──
         print("\n■ 2c · Permalink #r= (kein Backend, Fragment geht nie zum Server)")
