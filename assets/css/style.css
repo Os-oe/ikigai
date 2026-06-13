@@ -186,6 +186,12 @@ a { color: inherit; }
   font-size: clamp(1.3rem, 4.6vw, 1.7rem); line-height: 1.45; margin-bottom: .5rem;
 }
 .q-hint { font-size: .85rem; color: var(--ink-soft); margin-bottom: 1rem; }
+/* Wizard-Piping: greift eine frühere Antwort wörtlich auf (warmer Begleitton) */
+.q-piping {
+  font-family: var(--serif); font-style: italic; font-size: .92rem;
+  color: var(--ink-soft); border-left: 2px solid var(--accent);
+  padding-left: .7rem; margin: .2rem 0 .9rem;
+}
 .q-prefix { font-family: var(--serif); font-size: 1.05rem; color: var(--ink-soft); margin: .9rem 0 .4rem; }
 
 .q-input, .q-textarea {

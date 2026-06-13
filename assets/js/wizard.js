@@ -69,6 +69,36 @@
     } catch (e) { return null; }
   }
 
+  /* ---------- Permalink (#r=…) — Ergebnis komprimiert ins URL-Fragment.
+   * Das Fragment geht NIE zum Server → das Datenschutz-Versprechen bleibt wahr. ---------- */
+  function buildPermalink(ergebnis, ctx) {
+    if (!window.LZString) return "";
+    try {
+      var payload = { e: ergebnis, p: ctx.profil, i: ctx.ikigai9 };
+      return "#r=" + window.LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+    } catch (e) { return ""; }
+  }
+  function writePermalink(ergebnis, ctx) {
+    var frag = buildPermalink(ergebnis, ctx);
+    if (frag) { try { history.replaceState(null, "", location.pathname + location.search + frag); } catch (e) {} }
+  }
+  function readPermalink() {
+    if (!window.LZString) return null;
+    var h = location.hash || "";
+    if (h.indexOf("#r=") !== 0) return null;
+    try {
+      var json = window.LZString.decompressFromEncodedURIComponent(h.slice(3));
+      if (!json) return null;
+      var o = JSON.parse(json);
+      if (!o || !o.e || !o.e.zentrum || !o.e.kreise) return null;
+      return { ergebnis: o.e, profil: o.p || {}, ikigai9: o.i || [] };
+    } catch (e) { return null; }
+  }
+  /* öffentlicher Hook für den „Link kopieren“-Button auf der Ergebnis-Seite */
+  window.IKIGAI_PERMALINK = function (ergebnis, ctx) {
+    return location.origin + location.pathname + buildPermalink(ergebnis, ctx);
+  };
+
   /* ---------- DOM ---------- */
   var $ = function (sel) { return document.querySelector(sel); };
   var elHero = $("#screen-hero"), elWiz = $("#screen-wizard"),
@@ -198,12 +228,32 @@
       "<h2>" + st.block.name + "</h2><p>" + st.block.intro + "</p></div>";
   }
 
+  /* Wizard-Piping (P2): an späteren Fragen eine frühere Antwort WÖRTLICH aufgreifen
+   * (bevor die KI es tut). Clientseitig, 0 €. Greift nur, wenn die Quell-Antwort
+   * substanziell ist; sonst still ausgelassen. */
+  var PIPING = {
+    b1: { src: "a1", line: function (w) { return "Du hast vorhin „" + w + "“ erwähnt — jetzt drehen wir den Blick auf deine Stärken."; } },
+    c1: { src: "a3", line: function (w) { return "Behalte „" + w + "“ im Hinterkopf — was dich heute bewegt, hat oft dieselbe Wurzel."; } },
+    e3: { src: "a1", line: function (w) { return "Erinnerst du dich an „" + w + "“? Manchmal ist das eigene Ikigai näher, als man denkt."; } }
+  };
+  function pipingLine(fid) {
+    var cfg = PIPING[fid]; if (!cfg) return "";
+    var src = state.antworten[cfg.src];
+    if (typeof src !== "string" || src.trim().length < 8) return "";
+    /* ein prägnantes Wort aus der Quell-Antwort ziehen (längstes Wort > 4 Zeichen) */
+    var words = src.trim().split(/\s+/).filter(function (x) { return x.replace(/[^\wäöüÄÖÜß-]/g, "").length > 4; });
+    if (!words.length) return "";
+    var word = words.sort(function (a, b) { return b.length - a.length; })[0].replace(/[^\wäöüÄÖÜß-]/g, "");
+    return '<p class="q-piping">' + escapeHtml(cfg.line(word)) + "</p>";
+  }
+
   /* Frage (text / chips) */
   function renderFrage(card, st) {
     var f = st.frage;
     var html = "";
     if (f.type === "text") {
       html += '<p class="q-prompt">' + f.prompt + "</p>";
+      html += pipingLine(f.id);
       if (f.hint) html += '<p class="q-hint">' + f.hint + "</p>";
       if (f.prefix) html += '<p class="q-prefix">' + f.prefix + "</p>";
       var val = state.antworten[f.id] || "";
@@ -220,6 +270,7 @@
       });
     } else if (f.type === "chips") {
       html += '<p class="q-prompt">' + f.prompt + "</p>";
+      html += pipingLine(f.id);
       if (f.hint) html += '<p class="q-hint">' + f.hint + "</p>";
       var selVals = state.antworten[f.id] || [];
       html += '<div class="chips">';
@@ -414,7 +465,7 @@
           fast: FAST,
           reveal: true /* Typewriter-Reveal + Scroll-Lock beim ersten Anzeigen */
         };
-        if (!istBeispiel && !MOCK) saveResult(ergebnis, ctx);
+        if (!istBeispiel && !MOCK) { saveResult(ergebnis, ctx); writePermalink(ergebnis, ctx); }
         window.IKIGAI_RESULT.render(ergebnis, ctx);
         show(elResult);
       }, rest);
@@ -458,9 +509,17 @@
   }
   $("#start-btn").addEventListener("click", startWizard);
 
+  /* Permalink hat Vorrang: ein geteiltes/gespeichertes Ergebnis direkt öffnen */
+  var permaResult = !DEMO && readPermalink();
   var saved = !DEMO && load();
   var savedResult = !DEMO && !MOCK && loadResult();
-  if (DEMO) {
+  if (permaResult) {
+    window.IKIGAI_RESULT.render(permaResult.ergebnis, {
+      beispiel: false, profil: permaResult.profil,
+      ikigai9: permaResult.ikigai9, fast: FAST
+    });
+    show(elResult);
+  } else if (DEMO) {
     prefillLena();
     show(elWiz); render();
   } else if (savedResult && saved && saved.done) {

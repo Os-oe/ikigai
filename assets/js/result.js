@@ -167,6 +167,7 @@
           '<button id="btn-carousel" class="btn btn-accent">Als Karussell teilen (ZIP)</button>' +
           '<button id="btn-share-sq" class="btn">Einzel-Bild (der Satz)</button>' +
           '<button id="btn-share-story" class="btn">Story 9:16</button>' +
+          '<button id="btn-permalink" class="btn">Link kopieren</button>' +
           "</div>" +
           '<div class="share-preview"><canvas id="share-sq" class="sq" width="1080" height="1350"></canvas>' +
           '<canvas id="share-story" class="story" width="1080" height="1920"></canvas></div>' +
@@ -227,6 +228,14 @@
       var btnI = document.getElementById("btn-ics");
       if (btnI) btnI.addEventListener("click", function () {
         downloadIcs(ctx);
+      });
+      var btnP = document.getElementById("btn-permalink");
+      if (btnP) btnP.addEventListener("click", function () {
+        var url = (typeof window.IKIGAI_PERMALINK === "function") ? window.IKIGAI_PERMALINK(erg, ctx) : location.href;
+        var done = function () { btnP.textContent = "Link kopiert ✓"; setTimeout(function () { btnP.textContent = "Link kopieren"; }, 2200); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(done, function () { prompt("Link kopieren:", url); });
+        } else { prompt("Link kopieren:", url); }
       });
 
       /* Typewriter-Reveal: der Satz erscheint zuerst als Drumroll, dann öffnet
