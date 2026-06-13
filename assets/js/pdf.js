@@ -337,11 +337,16 @@
     D.footer();
 
     /* ════════ S4–S7 · je EINE Dimension ════════ */
+    /* tintAlpha pro Pigment: ein einheitliches 0.16 ließ den DUNKLEN Ruri-Blau-Kreis
+     * (S5 „Können“) über dem warmen Washi fast neutral-grau erscheinen (Review-P2.1:
+     * Hue kippte auf den Papier-Ton, Sättigung ~1 %). Dunkle, niedrig-luminante
+     * Pigmente brauchen mehr Deckung, um als Lasur zu LESEN. Warme/helle Pigmente
+     * (Akabeni/Kincha/Byakuroku) bleiben bei 0.16 — sie tönen dort schon klar. */
     var DIMS = [
-      { key: "liebe", wort: "Lieben", farbe: P.liebe, name: "Akabeni — Rotlack", block: "A", zitatKey: "a1" },
-      { key: "staerke", wort: "Können", farbe: P.staerke, name: "Ruri — Lapislazuli", block: "B", zitatKey: "b1" },
-      { key: "welt", wort: "Wirken", farbe: P.welt, name: "Byakuroku — Grünspan", block: "C", zitatKey: "c1" },
-      { key: "markt", wort: "Wert", farbe: P.markt, name: "Kincha — Goldbraun", block: "D", zitatKey: "d1" }
+      { key: "liebe", wort: "Lieben", farbe: P.liebe, name: "Akabeni — Rotlack", block: "A", zitatKey: "a1", tintAlpha: 0.16 },
+      { key: "staerke", wort: "Können", farbe: P.staerke, name: "Ruri — Lapislazuli", block: "B", zitatKey: "b1", tintAlpha: 0.34 },
+      { key: "welt", wort: "Wirken", farbe: P.welt, name: "Byakuroku — Grünspan", block: "C", zitatKey: "c1", tintAlpha: 0.20 },
+      { key: "markt", wort: "Wert", farbe: P.markt, name: "Kincha — Goldbraun", block: "D", zitatKey: "d1", tintAlpha: 0.16 }
     ];
     var kreisTexte = dimensionTexte(erg);
     DIMS.forEach(function (dim, di) {
@@ -350,12 +355,15 @@
        * großer Lasur-Blob füllt die untere Bildhälfte, riesiger Kanji-Wasserzeichen,
        * Inhalt sitzt mittig-oben — die Seite ist als Bühne bewusst komponiert. */
       var rand = A.rng(dim.key + "-pdf");
-      /* großer halbtransparenter Blob unten rechts (Bildgewicht) */
-      drawBlob(d, PW * 0.74, PH * 0.66, 52, A.rng(dim.key + "-big"), dim.farbe, 0.16);
-      /* Kanji-Wasserzeichen groß, sehr blass */
+      var tA = dim.tintAlpha == null ? 0.16 : dim.tintAlpha;
+      /* großer halbtransparenter Blob unten rechts (Bildgewicht) — Deckung pro Pigment */
+      drawBlob(d, PW * 0.74, PH * 0.66, 52, A.rng(dim.key + "-big"), dim.farbe, tA);
+      /* Kanji-Wasserzeichen groß, sehr blass — dunkle Pigmente etwas kräftiger,
+       * damit das Wasserzeichen auf der Blau-Seite nicht ebenfalls verschwindet. */
       d.setFont("Mincho", "normal"); d.setFontSize(150);
       d.setTextColor.apply(d, rgb(dim.farbe));
-      if (d.GState && d.setGState) { try { d.setGState(new d.GState({ opacity: 0.10 })); } catch (e) {} }
+      var kanjiOp = Math.min(0.16, 0.10 + (tA - 0.16) * 0.4);
+      if (d.GState && d.setGState) { try { d.setGState(new d.GState({ opacity: kanjiOp })); } catch (e) {} }
       d.text(A.KANJI[dim.key], PW * 0.62, PH * 0.5);
       if (d.setGState) { try { d.setGState(new d.GState({ opacity: 1 })); } catch (e) {} }
 
