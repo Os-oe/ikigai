@@ -1,74 +1,130 @@
-/* Canvas-Renderer des Ikigai-Visuals — für Share-Bild + PDF.
- * (SVG-in-<img> lädt keine Seiten-Fonts, darum eigener Renderer.) */
+/* Canvas-Renderer des Ikigai-Visuals — für Share-Bild, Karussell + PDF.
+ * Pixel-nah identisch zum SVG (venn.js): Lasur-Blobs via globalCompositeOperation
+ * 'multiply', Aquarell-Saum (Radialgradient), seeded Misregistration, saubere
+ * Zentrum-Plakette + Hanko, Labels + Kanji außen, großer Satz als Held.
+ * (SVG-in-<img> lädt keine Seiten-Fonts → eigener Renderer.) */
 (function () {
   "use strict";
 
+  var A = window.IKIGAI_ART, P = A.P, GEO = A.GEO;
   var SERIF = '"Shippori Mincho", Georgia, serif';
   var SANS = "Inter, sans-serif";
 
-  /* zeichnet das Venn in ctx, zentriert auf (cx0, cy0), Gesamtdurchmesser ~size */
-  window.IKIGAI_DRAW_VENN = function (ctx, data, cx0, cy0, size, opts) {
+  /* zeichnet einen organischen Blob-Pfad in ctx */
+  function blobToPath(ctx, cx, cy, r, rand, jf) {
+    var n = 8, jitter = jf == null ? 0.06 : jf, pts = [];
+    var phase = rand() * Math.PI * 2;
+    for (var i = 0; i < n; i++) {
+      var ang = phase + (i / n) * Math.PI * 2;
+      var rr = r * (1 + (rand() * 2 - 1) * jitter);
+      pts.push([cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr]);
+    }
+    ctx.beginPath();
+    for (var k = 0; k < n; k++) {
+      var p0 = pts[(k - 1 + n) % n], p1 = pts[k], p2 = pts[(k + 1) % n], p3 = pts[(k + 2) % n];
+      if (k === 0) ctx.moveTo(p1[0], p1[1]);
+      ctx.bezierCurveTo(
+        p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+        p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6,
+        p2[0], p2[1]);
+    }
+    ctx.closePath();
+  }
+
+  /* Nur das Diagramm (Blobs + Plakette + Hanko + Labels), zentriert auf (cx0,cy0).
+   * opts.ghost = blasses Geister-Venn (Karussell-Slide 2), opts.noCenter = ohne Plakette. */
+  window.IKIGAI_DRAW_DIAGRAM = function (ctx, data, cx0, cy0, size, opts) {
     opts = opts || {};
-    var GEO = window.IKIGAI_GEO;
     var k = size / GEO.vb;
     var r = GEO.r * k, off = GEO.off * k;
-    var ink = "#211d18", soft = "#5b5347";
+    var seed = A.seedFromData(data);
+    var rand = A.rng(seed);
+    var ghost = !!opts.ghost;
 
-    GEO.circles.forEach(function (ci) {
+    /* ── Lasur-Blobs (multiply) ── */
+    ctx.save();
+    ctx.globalCompositeOperation = ghost ? "source-over" : "multiply";
+    GEO.circles.forEach(function (ci, i) {
       var cx = cx0 + ci.dx * off, cy = cy0 + ci.dy * off;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = hexA(ci.color, 0.16);
+      var mr = A.misreg(rand, k);
+      var cr = A.rng(seed + i * 131);
+      ctx.save();
+      ctx.translate(cx + mr.dx, cy + mr.dy);
+      ctx.rotate((ci.key === "liebe" ? mr.rot + 0.3 : mr.rot) * Math.PI / 180);
+      blobToPath(ctx, 0, 0, r, cr, 0.06);
+      var grad = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r * 1.02);
+      var aMul = ghost ? 0.4 : 1;
+      grad.addColorStop(0, A.hexA(ci.color, 0.30 * aMul));
+      grad.addColorStop(0.62, A.hexA(ci.color, 0.42 * aMul));
+      grad.addColorStop(0.90, A.hexA(ci.deep, 0.60 * aMul));
+      grad.addColorStop(1, A.hexA(ci.deep, 0.16 * aMul));
+      ctx.fillStyle = grad;
       ctx.fill();
-      ctx.strokeStyle = hexA(ci.color, 0.55);
-      ctx.lineWidth = Math.max(1.2, 1.5 * k);
-      ctx.stroke();
+      ctx.restore();
     });
+    ctx.restore();
 
-    ctx.textAlign = "center";
-
-    /* Labels + Begriffe */
-    GEO.circles.forEach(function (ci) {
-      var cx = cx0 + ci.dx * off, cy = cy0 + ci.dy * off;
-      var lx = cx + ci.dx * (r * 0.42), ly = cy + ci.dy * (r * 0.46);
-      var terms = (data.kreise && data.kreise[ci.key]) || [];
-      var lines = [{ t: ci.label.toUpperCase(), f: "600 " + Math.round(11 * k) + "px " + SANS, c: ci.color, sp: 1.2 }];
-      terms.slice(0, 3).forEach(function (t) {
-        lines.push({ t: t, f: "italic 500 " + Math.round(14 * k) + "px " + SERIF, c: ink });
-      });
-      var lh = 19 * k, startY = ly - ((lines.length - 1) * lh) / 2;
-      lines.forEach(function (ln, i) {
-        ctx.font = ln.f; ctx.fillStyle = ln.c;
-        ctx.fillText(ln.t, lx, startY + i * lh);
-      });
-    });
-
-    /* Schnittmengen */
-    if (data.schnittmengen) {
-      ctx.font = "italic 500 " + Math.round(11.5 * k) + "px " + SERIF;
-      ctx.fillStyle = soft;
-      GEO.overlaps.forEach(function (ov) {
-        var t = data.schnittmengen[ov.key];
-        if (!t) return;
-        var rad = (ov.angle * Math.PI) / 180, d = off * GEO.overlapDist;
-        ctx.fillText(t, cx0 + Math.cos(rad) * d, cy0 + Math.sin(rad) * d);
-      });
+    /* ── Zentrum-Plakette + Hanko ── */
+    if (!opts.noCenter && !ghost) {
+      var inits = A.initials(opts.name);
+      var plW = 96 * k, plH = 96 * k, rx = 9 * k;
+      roundRect(ctx, cx0 - plW / 2, cy0 - plH / 2, plW, plH, rx);
+      ctx.fillStyle = A.hexA(P.paperWarm, 0.94); ctx.fill();
+      ctx.lineWidth = 1 * k; ctx.strokeStyle = A.hexA(P.line, 0.6); ctx.stroke();
+      /* Hanko */
+      blobToPath(ctx, cx0, cy0 - 8 * k, 26 * k, A.rng(seed + 7), 0.04);
+      ctx.fillStyle = A.hexA(P.accent, 0.9); ctx.fill();
+      ctx.textAlign = "center";
+      ctx.fillStyle = P.paper;
+      ctx.font = "700 " + Math.round(20 * k) + "px " + SANS;
+      ctx.fillText(inits, cx0, cy0 - 1 * k + 7 * k);
+      ctx.fillStyle = P.grau;
+      ctx.font = "600 " + Math.round(8 * k) + "px " + SANS;
+      setLS(ctx, 0.3 * 8 * k);
+      ctx.fillText("IKIGAI", cx0, cy0 + 32 * k);
+      setLS(ctx, 0);
     }
 
-    /* Zentrum */
-    var fit = GEO.zentrumFit(data.zentrum);
-    var zl = GEO.wrap(data.zentrum || "", fit.chars, fit.lines);
-    var zlh = fit.lh * k, zy = cy0 - ((zl.length - 1) * zlh) / 2 + 2 * k;
-    ctx.font = "600 " + Math.round(10 * k) + "px " + SANS;
-    ctx.fillStyle = "#f6303a";
-    ctx.fillText("I K I G A I", cx0, zy - zlh - 8 * k);
-    ctx.font = "600 " + Math.round(fit.size * k) + "px " + SERIF;
-    ctx.fillStyle = ink;
-    zl.forEach(function (ln, i) { ctx.fillText(ln, cx0, zy + i * zlh); });
+    /* ── Labels außen + Kanji + Begriffe ── */
+    ctx.textAlign = "center";
+    GEO.circles.forEach(function (ci) {
+      var cx = cx0 + ci.dx * off, cy = cy0 + ci.dy * off;
+      var ax = cx + ci.dx * (r * 0.74), ay = cy + ci.dy * (r * 0.78);
+      var terms = (data.kreise && data.kreise[ci.key]) || [];
+      ctx.fillStyle = A.hexA(P.grau, 0.55);
+      ctx.font = "400 " + Math.round(26 * k) + "px " + SERIF;
+      ctx.fillText(A.KANJI[ci.key], ax, ay - 30 * k);
+      ctx.fillStyle = P.grau;
+      ctx.font = "600 " + Math.round(13 * k) + "px " + SANS;
+      setLS(ctx, 0.28 * 13 * k);
+      ctx.fillText(ci.label.toUpperCase(), ax, ay - 8 * k);
+      setLS(ctx, 0);
+      ctx.fillStyle = P.sumi;
+      ctx.font = "500 " + Math.round(13 * k) + "px " + SANS;
+      terms.slice(0, 3).forEach(function (t, i) { ctx.fillText(t, ax, ay + (12 + i * 17) * k); });
+      ctx.fillStyle = P.grau;
+      ctx.font = "italic 400 " + Math.round(11 * k) + "px " + SERIF;
+      ctx.fillText(A.FARBNAMEN[ci.key], ax, ay + (12 + Math.min(terms.length, 3) * 17 + 4) * k);
+    });
   };
 
-  function hexA(hex, a) {
-    var n = parseInt(hex.slice(1), 16);
-    return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  /* Volles Venn-Artefakt mit großem Satz darunter — für PDF S3 + (optional) Fallbacks.
+   * Erwartet ctx mit bereits gefülltem Hintergrund. cx0/topY in px. */
+  window.IKIGAI_DRAW_VENN = function (ctx, data, cx0, cy0, size, opts) {
+    opts = opts || {};
+    window.IKIGAI_DRAW_DIAGRAM(ctx, data, cx0, cy0, size, opts);
+  };
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function setLS(ctx, px) {
+    if ("letterSpacing" in ctx) { try { ctx.letterSpacing = px + "px"; } catch (e) {} }
   }
 })();

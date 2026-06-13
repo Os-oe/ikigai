@@ -36,10 +36,9 @@
           "Deine Antworten wurden <strong>nicht</strong> ausgewertet und nicht gespeichert. Versuch es später noch einmal.</div>";
       }
 
-      /* 1 · Visual */
+      /* 1 · Visual — der Satz lebt jetzt IM Diagramm (Held unter den Kreisen) */
       html += section("Dein Ergebnis", anrede + " ist dein Ikigai — auf beiden Ebenen.",
-        '<p class="r-zentrum">„' + esc(erg.zentrum) + '“</p>' +
-        '<div class="venn-wrap" id="venn-wrap">' + window.IKIGAI_VENN(erg) + "</div>");
+        '<div class="venn-wrap" id="venn-wrap">' + window.IKIGAI_VENN(erg, { name: name }) + "</div>");
 
       /* 2 · Alltags-Ebene */
       var alltagHtml = '<div class="alltag-grid">';
