@@ -151,7 +151,13 @@ a { color: inherit; }
 .screen-wizard {
   display: flex; flex-direction: column;
   max-width: 660px; margin: 0 auto; padding: 1.4rem 1.4rem 2rem;
-  min-height: 88dvh;
+  /* Volle Viewport-Höhe: damit der Frage-Block (zentriert in .wizard-stage)
+   * gegen die GANZE Sichtfläche zentriert wird statt nur gegen den Raum über
+   * der Fußzeile (Review-P2.2: Inhalt klebte im oberen Drittel, große leere
+   * Mitte, Nav schwebte tief). Head oben, Stage füllt die Mitte (Frage exakt
+   * zentriert), Nav unten — die Fußzeile rutscht knapp unter die Falz
+   * (nur Rechts-Links, per Scroll erreichbar). */
+  min-height: 100dvh;
 }
 .wizard-head { display: flex; align-items: center; gap: .9rem; margin-bottom: 1rem; }
 .progress-enso { position: relative; width: 48px; height: 48px; flex: 0 0 48px; }
