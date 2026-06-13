@@ -86,6 +86,32 @@ wiederverwendbar für künftige Wizard-/Live-KI-Projekte.
   Tests waren auf das ALTE Design geeicht (PDF==6 Seiten, Share 1080×1080) und hätten grün-trügerisch falsche Zahlen
   zementiert — Test-Update gehört zwingend zum Redesign.
 
+## R4 — Long-Text-Gate (13.06.2026)
+
+- **Eine kurze Demo-Persona verdeckt Layout-Mängel systematisch.** „Lena" (`?demo=1`) hatte
+  kurze Antworten — die Venn-/Karussell-/PDF-Overflows traten NUR bei langen, mehrwortigen
+  + unbrechbar langen Begriffen auf. 3 Auto-Fix-Runden liefen am Mangel vorbei, weil sie immer
+  gegen die kurze Demo testeten. **Lehre: ein Long-Text-Fixture (`?demo=long`) gehört zum
+  Standard-Visual-Gate jedes Generators** — lange + bewusst unbrechbare Begriffe
+  („Interdisziplinäre Systemarchitektur") als feste Stress-Persona neben der schönen Demo.
+- **Horizontales Stauchen ist nie der richtige Overflow-Fallback.** `textLength="…"
+  lengthAdjust="spacingAndGlyphs"` (SVG) und `ctx.scale(s,1)` (Canvas) lassen ein langes Wort
+  zu unleserlich kondensierten Buchstaben zusammenlaufen — liest als kaputt. Richtige Kette:
+  **(1) Wort-Wrap → (2) bei unbrechbaren Einzelwörtern Schrift stufenweise verkleinern → (3)
+  erst als letzte Stufe Hard-Break per Zeichen (mit Bindestrich) → (4) ggf. kuratierte Ellipse.**
+  Ein gemeinsamer `fitWrap`-Helfer in `ikigai-art.js` für SVG/Canvas/Karussell hält das konsistent.
+- **Mehrzeilige Labels brauchen einen Block-Höhen-Plan, sonst spillt der obere Kreis raus.**
+  Beim 4-Kreise-Venn wächst der Top-Lobe-Block nach OBEN (viewBox-Kopfraum reservieren), der
+  Bottom nach unten, die Seiten zentriert — sonst stößt der Top-Block an die viewBox-Oberkante.
+- **Rotierte PDF-Marginalie + langer Fließtext = Kollision.** Hashira ganz in den Margin (PW-4)
+  UND den Body-Satzspiegel hart auf eine `BODY_RIGHT`-Konstante clampen — `splitTextToSize` ist
+  ein Ziel, keine harte Grenze; der Gutter muss geometrisch garantiert sein, nicht gehofft.
+- **„Komponiert" schlägt „voll-zentriert" auf Desktop.** Ein 660px-Wizard mit `min-height:100dvh`
+  + vertikal zentrierter Stage liest auf 1440px als leer/unfertig (riesige Leerflächen, tief
+  schwebende Nav). Fix: gerahmtes, schmaleres Panel das seinen Inhalt hugt (`flex:0 0 auto`) —
+  Head/Frage/Nav gruppiert. Die alte R3-„voll-zentriert"-Regel war ein lokales Optimum; der
+  Layout-Test musste auf das neue Gruppierungs-Intent umgeschrieben werden.
+
 ## Kosten (Ist)
 
 | Posten | Menge | Ist |

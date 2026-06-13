@@ -138,3 +138,29 @@ Kosten Redesign: ~0 € (alles Code/SVG/Canvas; nur 2 Live-Gemini-Calls der Suit
 - LESSONS.md geschrieben · Sales-Board Lead `lead-mqb92k04ejes` (Sprint `one-prompt-kit-ikigai`, delivered, Demo-Record)
 - Lauf-Status: `agent-studio/.planning/one-prompt/ikigai/RUN-STATUS.md` (inkl. Capture-Hinweise)
 - Alle lokalen Dev-Server beendet.
+
+## R4 — Finale Fix-Session (13.06.2026): Long-Text-Mängel
+
+Nach 3 Review-Runden blieben 2 P1- + 3 P2-Mängel offen, die die Auto-Fix-Runden NICHT
+erwischten — **weil die Demo-Persona „Lena" (?demo=1) kurze Antworten hat und die Mängel
+nur bei LANGEN, realistischen Begriffen auftreten.** Hebel dieser Session: ein
+Long-Text-Fixture (`?demo=long`, Persona „Konstantin", LENA_LONG) mit mehrwortigen +
+unbrechbar langen Begriffen („Interdisziplinäre Systemarchitektur", „Menschen in
+Übergangsphasen begleiten"). Jeder Fix gegen dieses Fixture visuell verifiziert.
+
+| Finding | Fix | Beleg |
+|---|---|---|
+| **P1-A** Venn bricht bei langen Begriffen (Text spillt aus Lobes, Top-Lobe komplett raus, Seiten-Labels in Nachbarzonen) | Begriffe mehrzeilig umbrechen + Schrift stufenweise schrumpfen (NIE horizontal stauchen), Hard-Break unbrechbarer Wörter; Block-Layout top-up/bottom-down/seiten-zentriert; viewBox-Kopfraum (`vTop`); langer Satz maxLines 4→7 (keine '…'-Trunkierung mehr). SVG (`venn.js`) **und** Canvas (`visual-canvas.js`). | `L3-venn-svg.png`, `L-pdf-page-03.png` |
+| **P1-B** Karussell-Slide 2 quetscht lange Antworten horizontal unleserlich | `wrapDraw`→`fitWrap` auf allen Text-Slides: Wort-Wrap + Schrift-Shrink, kein `scale(s,1)`-Squeeze mehr; Slide-2-Wortbudget 330→430px + 3 Zeilen. | `L2-slide-2.png`, `L2-slide-3.png`, `L2-slide-5.png` |
+| **P2-A** PDF-Laufkopf kollidiert mit Fließtext (S2/S8/S10) | Hashira PW-8→PW-4 (ganz in den Margin) + Body-Satzspiegel hart auf `BODY_RIGHT`=PW-16 geclamped → garantierter leerer Gutter. | `L-pdf-page-{02,08,10}.png` |
+| **P2-B** Venn-Achsen-Labels zu kontrastarm (hellgrau auf Lasur) | Dunkle Sumi-Tinte + helle Backing-Pill hinter jedem Versal-Label. SVG + Canvas (Ergebnisseite + PDF). | `L3-venn-svg.png`, `L-pdf-page-03.png` |
+| **P2-C** Desktop-Wizard wirkt auf breiten Screens leer | Auf ≥720px komponiertes, gerahmtes Washi-Panel (max-width 600, vertikal zentriert), Stage hugt Inhalt (flex:0 0 auto) → Head/Frage/Nav gruppiert. Mobile unverändert. | `D2-wizard-1440.png`, `M-wizard-390.png` (Mobile-Parität) |
+| **P3** Story-Export erbt 6er-Deck-Paginierung „03 — 06" | `SUPPRESS_PAGINATION`-Flag beim Story-Render. | — |
+
+P3 Font-Preload-Warnung **bewusst nicht** angefasst (kosmetisch; Preloads sind korrekt
+gesetzt + helfen Hero-LCP, Entfernen wäre Regress). Hero-Desktop-Leerraum bewusst ruhig.
+
+**Test:** `tests/suite.py` um R4-Long-Text-Gate erweitert (Venn ohne `textLength`-Stauchung,
+Satz nicht trunkiert, Slide-2-Wort umgebrochen statt gestaucht, fitWrap-Hard-Break, alle 6
+Long-Slides 1080×1350, PDF <1MB + Gutter Body↔Hashira leer via PyMuPDF-Pixel-Check). 99/99
+lokal 2× grün. `live_suite` 2× grün gegen Live-URL. Keine bezahlten Calls.
