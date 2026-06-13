@@ -50,6 +50,8 @@ s, b = get("/")
 check("/ → 200 + Titel", s == 200 and b"ikigAI" in b)
 for p in ["/impressum.html", "/datenschutz.html", "/assets/img/og.png",
           "/assets/fonts/shippori-600.woff2", "/assets/vendor/jspdf.umd.min.js",
+          "/assets/vendor/shippori-pdf-fonts.js", "/assets/vendor/lz-string.min.js",
+          "/assets/js/ikigai-art.js", "/assets/js/carousel.js",
           "/assets/img/logo-mark.png"]:
     s, b = get(p)
     check(f"{p} → 200", s == 200 and len(b) > 500)
@@ -88,10 +90,20 @@ with sync_playwright() as pw:
     check("Kaizen 4 Wochen da", body.count("WOCHE") >= 4)
     check("Wahre Geschichte da", "Zuzunaga" in body)
 
+    # Permalink wurde nach echter Synthese ins Fragment geschrieben
+    h = pg.evaluate("location.hash")
+    check("Permalink #r= nach Live-Synthese geschrieben", h.startswith("#r=") and len(h) > 100)
+
     with pg.expect_download(timeout=60000) as dl:
         pg.click("#btn-pdf")
     data = open(dl.value.path(), "rb").read()
-    check(f"PDF live baubar ({len(data)//1024} KB)", data[:4] == b"%PDF" and len(data) > 80 * 1024)
+    check(f"PDF live baubar, Mincho, < 1 MB ({len(data)//1024} KB)",
+          data[:4] == b"%PDF" and 200 * 1024 < len(data) < 1024 * 1024 and b"Mincho" in data)
+
+    # Karussell-ZIP live
+    with pg.expect_download(timeout=60000) as dl:
+        pg.click("#btn-carousel")
+    check("Karussell-ZIP live baubar", dl.value.suggested_filename.endswith(".zip"))
     pg.close()
     browser.close()
 

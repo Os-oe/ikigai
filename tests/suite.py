@@ -143,7 +143,12 @@ try:
         svg = pg.locator("#venn-wrap svg").inner_html()
         check("Visual zeigt User-Begriff (Fotografie)", "Fotografie" in svg)
         check("Visual zeigt User-Begriff (Markt-Kreis)", "Projektmanagement" in svg)
-        check("Visual: Zentrum-Satz gerendert", "Ordnung" in svg)
+        check("Visual: Zentrum-Satz als Held gerendert", "Ordnung" in svg)
+        # Lasur-Venn: Multiply-Blobs statt Outlines, saubere Center-Plakette + Hanko (Initialen)
+        check("Venn: Lasur-Blobs via mix-blend-mode multiply", "multiply" in svg)
+        check("Venn: saubere Center-Plakette + Hanko (Initiale L)", 'class="venn-center"' in svg and ">L<" in svg)
+        check("Venn: Kanji-Marker außen (愛 技 世 価)", "愛" in svg and "技" in svg)
+        check("Venn: Farbnamen sind Content (Ruri/Akabeni)", "Ruri" in svg or "Akabeni" in svg)
         body_txt = pg.locator("#result-root").inner_text()
         check("Erkenntnis zitiert wörtlich", "Hochzeitsreportage mit meiner Kamera" in body_txt)
         check("Ideen mit Begründungskette sichtbar", "Weil du" in body_txt)
@@ -182,18 +187,23 @@ try:
         f = dl.value.path()
         data = open(f, "rb").read()
         check("PDF lädt herunter, beginnt mit %PDF", data[:4] == b"%PDF")
-        check(f"PDF > 80 KB ({len(data)//1024} KB)", len(data) > 80 * 1024)
+        check(f"PDF > 200 KB ({len(data)//1024} KB)", len(data) > 200 * 1024)
+        check(f"PDF < 1 MB ({len(data)//1024} KB, Brief-Cap)", len(data) < 1024 * 1024)
         pages = len(re.findall(rb"/Type\s*/Page\b(?!s)", data))
-        check(f"PDF hat 6 Seiten ({pages})", pages == 6)
+        check(f"PDF Premium-Workbook 9-12 Seiten ({pages})", 9 <= pages <= 12)
+        # Mincho eingebettet (selektierbarer Vektor-Text, nicht Times/Canvas-Screenshot)
+        check("PDF: Shippori Mincho als TTF eingebettet (kein Times)",
+              b"Mincho" in data and b"FontFile2" in data)
         check("PDF-Dateiname personalisiert", "lena" in dl.value.suggested_filename)
 
         def png_dims(b):
             return int.from_bytes(b[16:20], "big"), int.from_bytes(b[20:24], "big")
+        # Default-Einzel-Share = Satz-Slide im 4:5-Format (1080×1350) — der Satz ist der Held
         with pg.expect_download(timeout=20000) as dl:
             pg.click("#btn-share-sq")
         b = open(dl.value.path(), "rb").read()
-        check(f"Share 1:1 = 1080×1080 ({png_dims(b)})", png_dims(b) == (1080, 1080))
-        check("Share 1:1 ist substanzielles PNG", b[:8] == b"\x89PNG\r\n\x1a\n" and len(b) > 60 * 1024)
+        check(f"Share-Karte = 1080×1350 (4:5) ({png_dims(b)})", png_dims(b) == (1080, 1350))
+        check("Share-Karte ist substanzielles PNG", b[:8] == b"\x89PNG\r\n\x1a\n" and len(b) > 60 * 1024)
         with pg.expect_download(timeout=20000) as dl:
             pg.click("#btn-share-story")
         b = open(dl.value.path(), "rb").read()
@@ -201,9 +211,57 @@ try:
         # Vorschau-Canvases tatsächlich bemalt?
         painted = pg.evaluate("""(() => {
           const c = document.getElementById('share-sq');
-          const d = c.getContext('2d').getImageData(540, 540, 1, 1).data;
+          const d = c.getContext('2d').getImageData(540, 675, 1, 1).data;
           return d[3] > 0; })()""")
         check("Share-Vorschau gerendert (Pixel im Zentrum)", painted)
+
+        # ── Karussell-ZIP: 6 Slides + Story + LinkedIn-PDF ──
+        with pg.expect_download(timeout=40000) as dl:
+            pg.click("#btn-carousel")
+        zpath = dl.value.path()
+        check("Karussell-ZIP lädt (.zip)", dl.value.suggested_filename.endswith(".zip"))
+        import zipfile
+        with zipfile.ZipFile(zpath) as z:
+            names = z.namelist()
+            slides = [n for n in names if n.startswith("ikigai-slide-")]
+            check(f"ZIP: 6 IG-Slides ({len(slides)})", len(slides) == 6)
+            check("ZIP: Story-PNG enthalten", any("story" in n for n in names))
+            check("ZIP: LinkedIn-PDF enthalten", any(n.endswith(".pdf") for n in names))
+            # ein Slide-PNG hat 1080×1350
+            sb = z.read(sorted(slides)[0])
+            check(f"ZIP-Slide = 1080×1350 ({png_dims(sb)})", png_dims(sb) == (1080, 1350))
+        pg.close()
+
+        # ── 2c · Permalink (#r=…) — Ergebnis komprimiert ins URL-Fragment ──
+        print("\n■ 2c · Permalink #r= (kein Backend, Fragment geht nie zum Server)")
+        with open(os.path.join(ROOT, "assets/js/lena.js"), encoding="utf-8") as fh:
+            lena_js = fh.read()
+        lena_erg = json.loads(subprocess.run(["node", "-e",
+            "global.window={};" + lena_js + ";console.log(JSON.stringify(window.LENA.ergebnis))"],
+            capture_output=True, text=True).stdout)
+        pg = browser.new_page()
+        pg.route("**/api/synthesize", lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"ok": True, "ergebnis": lena_erg})))
+        perr = []; pg.on("pageerror", lambda e: perr.append(str(e)))
+        pg.goto("http://127.0.0.1:8982/?demo=1&fast=1")
+        pg.wait_for_load_state("networkidle")
+        pg.click("#nav-next")
+        pg.wait_for_selector("#screen-result:not([hidden])", timeout=15000)
+        pg.wait_for_timeout(300)
+        h = pg.evaluate("location.hash")
+        check("Permalink ins URL-Fragment geschrieben (#r=)", h.startswith("#r=") and len(h) > 100)
+        permalink = pg.evaluate("window.IKIGAI_PERMALINK(window.__ikig.lastResult, {profil: window.LENA.profil, ikigai9: window.LENA.ikigai9})")
+        pg.close()
+        # frische Seite NUR mit dem Fragment → Ergebnis muss direkt erscheinen
+        frag = permalink[permalink.index("#"):]
+        pg = browser.new_page()
+        perr2 = []; pg.on("pageerror", lambda e: perr2.append(str(e)))
+        pg.goto("http://127.0.0.1:8982/?fast=1" + frag)
+        pg.wait_for_load_state("networkidle")
+        check("Permalink öffnet Ergebnis direkt (ohne Wizard)", pg.locator("#screen-result:not([hidden])").count() == 1)
+        check("Permalink-Ergebnis zeigt den Satz", "Ordnung" in pg.locator("#result-root").inner_text())
+        check("Permalink: keine JS-Fehler", not perr and not perr2, extra="; ".join((perr + perr2)[:2]))
         pg.close()
 
         # ── 3 · localStorage-Resume ──
@@ -296,8 +354,9 @@ try:
         pg.goto("http://127.0.0.1:8982/?fast=1")
         pg.wait_for_load_state("networkidle")
         total = sum(s for _, s in sizes)
-        check(f"Erst-Load < 350 KB ({total//1024} KB, {len(sizes)} Requests)", total < 350 * 1024)
+        check(f"Erst-Load < 400 KB ({total//1024} KB, {len(sizes)} Requests, Brief-Cap)", total < 400 * 1024)
         check("jsPDF NICHT im Erst-Load", not any("jspdf" in u for u, _ in sizes))
+        check("PDF-Mincho-Fonts NICHT im Erst-Load (lazy)", not any("shippori-pdf-fonts" in u for u, _ in sizes))
         pg.close()
 
         browser.close()
