@@ -124,20 +124,49 @@
       var ax = cx + ci.dx * (r * 0.74), ay = cy + ci.dy * (r * 0.78);
       var bud = labelBudget(ci, ax);
       var terms = (data.kreise && data.kreise[ci.key]) || [];
-      ctx.fillStyle = A.hexA(P.grau, 0.55);
+
+      /* Label + Begriffe mehrzeilig umbrechen + schrumpfen (NIE horizontal stauchen).
+       * fitWrap misst echte Breiten + bricht unbrechbare Wörter hart (Review-P1). */
+      var labFit = A.fitWrap(ctx, ci.label.toUpperCase(), bud, 2,
+        function (s) { return "600 " + Math.round(s) + "px " + SANS; }, 13 * k, 10 * k);
+      var termFits = terms.slice(0, 3).map(function (t) {
+        return A.fitWrap(ctx, t, bud, 2, function (s) { return "500 " + Math.round(s) + "px " + SANS; }, 13 * k, 10 * k);
+      });
+      var labLh = labFit.size * 1.18, capH = 15 * k, gap = 7 * k;
+      var labH = labFit.lines.length * labLh;
+      var termsH = 0; termFits.forEach(function (f) { termsH += f.lines.length * f.size * 1.18 + 5 * k; });
+      var contentH = labH + gap + termsH + capH;
+      /* Block-Oberkante: oben wächst nach oben, unten nach unten, Seiten zentriert */
+      var top;
+      if (ci.dy < 0) top = ay - 28 * k - contentH;
+      else if (ci.dy > 0) top = ay + 14 * k;
+      else top = ay - contentH / 2;
+
+      /* Kanji über dem Block */
+      ctx.fillStyle = A.hexA(P.sumi, 0.5);
       ctx.font = "400 " + Math.round(26 * k) + "px " + SERIF;
-      ctx.fillText(A.KANJI[ci.key], ax, ay - 30 * k);
-      ctx.fillStyle = P.grau;
-      ctx.font = "600 " + Math.round(13 * k) + "px " + SANS;
-      setLS(ctx, 0.28 * 13 * k);
-      fitText(ctx, ci.label.toUpperCase(), ax, ay - 8 * k, bud);
-      setLS(ctx, 0);
+      ctx.fillText(A.KANJI[ci.key], ax, top - gap);
+      /* Backing-Pill hinter dem Versal-Label (Kontrast über Lasur-Fläche, P2-B) */
+      var pillW = bud + 12 * k, pillH = labH + 8 * k;
+      ctx.fillStyle = A.hexA(P.paper, 0.82);
+      roundRect(ctx, ax - pillW / 2, top - labFit.size, pillW, pillH, 5 * k); ctx.fill();
+      /* Versal-Label: dunkle Sumi-Tinte (P2-B) */
       ctx.fillStyle = P.sumi;
-      ctx.font = "500 " + Math.round(13 * k) + "px " + SANS;
-      terms.slice(0, 3).forEach(function (t, i) { fitText(ctx, t, ax, ay + (12 + i * 17) * k, bud); });
+      ctx.font = "600 " + Math.round(labFit.size) + "px " + SANS;
+      setLS(ctx, 0.24 * labFit.size);
+      var ly = top;
+      labFit.lines.forEach(function (ln) { ctx.fillText(ln, ax, ly); ly += labLh; });
+      setLS(ctx, 0);
+      ly = top + labH + gap;
+      ctx.fillStyle = P.sumi;
+      termFits.forEach(function (f) {
+        ctx.font = "500 " + Math.round(f.size) + "px " + SANS;
+        f.lines.forEach(function (ln) { ctx.fillText(ln, ax, ly); ly += f.size * 1.18; });
+        ly += 5 * k;
+      });
       ctx.fillStyle = P.grau;
       ctx.font = "italic 400 " + Math.round(11 * k) + "px " + SERIF;
-      fitText(ctx, A.FARBNAMEN[ci.key], ax, ay + (12 + Math.min(terms.length, 3) * 17 + 4) * k, bud);
+      ctx.fillText(A.FARBNAMEN[ci.key], ax, ly + 2 * k);
     });
   };
 
