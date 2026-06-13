@@ -37,9 +37,15 @@
     };
     /* Erkenntnis als Beobachtung (kein Defizit) */
     var erk = c.erkenntnis || ((erg.erkenntnisse || [])[0] || {}).text || "";
-    /* 3 Freuden aus Alltag (nahbar, risikolos) */
+    /* 3 Freuden aus Alltag (nahbar, risikolos) — auf ~7 Wörter verdichtet, ein
+     * Halbsatz reicht; lange Sätze würden auf der Slide hart abgeschnitten. */
     var freuden = c.freuden || (erg.alltag || []).slice(0, 3).map(function (a) {
-      return String(a.moment || "").replace(/^(der|die|das|mein|meine|ein|eine)\s+/i, "");
+      var t = String(a.moment || "").replace(/^(der|die|das|mein|meine|ein|eine)\s+/i, "");
+      /* an erster Sinngrenze (Komma/Gedankenstrich) kürzen, dann auf 7 Wörter */
+      t = t.split(/\s*[—–,]\s+/)[0];
+      var w = t.split(/\s+/);
+      if (w.length > 7) t = w.slice(0, 7).join(" ");
+      return t;
     });
     var schritt = c.schritt || (((erg.ideen || [])[0] || {}).erster_schritt) || "";
     return {
@@ -106,6 +112,27 @@
   }
 
   function ls(ctx, px) { if ("letterSpacing" in ctx) { try { ctx.letterSpacing = px + "px"; } catch (e) {} } }
+
+  /* Bricht Text in <=maxLines Zeilen; letzte Zeile ggf. mit „…“ statt hartem Schnitt. */
+  function wrapLines(ctx, text, maxW, font, maxLines) {
+    ctx.font = font;
+    var words = String(text).split(/\s+/), line = "", lines = [];
+    for (var i = 0; i < words.length; i++) {
+      var test = (line + " " + words[i]).trim();
+      if (ctx.measureText(test).width > maxW && line) {
+        lines.push(line); line = words[i];
+        if (lines.length === maxLines - 1) {
+          /* Rest in die letzte Zeile, bei Überlänge sauber kürzen */
+          var rest = words.slice(i).join(" ");
+          while (rest && ctx.measureText(rest + "…").width > maxW) rest = rest.replace(/\s*\S+$/, "");
+          lines.push((rest || words[i]) + (words.slice(i).join(" ") !== rest ? "…" : ""));
+          return lines;
+        }
+      } else line = test;
+    }
+    if (line) lines.push(line);
+    return lines.slice(0, maxLines);
+  }
 
   function wrapDraw(ctx, text, x, y, maxW, lh, font, color, align) {
     ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "center";
@@ -213,16 +240,18 @@
       ctx.fillText("Kleine Freuden", W / 2, 280);
       ctx.fillStyle = P.grau; ctx.font = "italic 400 28px " + SERIF;
       ctx.fillText("die dich schon heute tragen", W / 2, 330);
-      var y = 560;
+      var y = 520, tickX = W * 0.17, textX = W * 0.24, maxW = W - textX - 120;
       d.freuden.forEach(function (f) {
         /* roter Pinsel-Tick statt Bullet */
         ctx.save();
         ctx.strokeStyle = A.hexA(P.accent, 0.85); ctx.lineWidth = 8; ctx.lineCap = "round";
-        ctx.beginPath(); ctx.moveTo(W * 0.18, y - 12); ctx.quadraticCurveTo(W * 0.22, y - 24, W * 0.26, y - 14);
+        ctx.beginPath(); ctx.moveTo(tickX, y - 12); ctx.quadraticCurveTo(tickX + W * 0.04, y - 24, tickX + W * 0.08, y - 14);
         ctx.stroke(); ctx.restore();
-        ctx.textAlign = "left"; ctx.fillStyle = P.sumi; ctx.font = "500 40px " + SANS;
-        var t = String(f); if (t.length > 34) t = t.slice(0, 33) + "…";
-        ctx.fillText(t, W * 0.30, y); y += 130;
+        /* sauberer Umbruch auf max. 2 Zeilen statt hartem „…“-Abschnitt */
+        var lines = wrapLines(ctx, String(f), maxW, "500 38px " + SANS, 2);
+        ctx.textAlign = "left"; ctx.fillStyle = P.sumi; ctx.font = "500 38px " + SANS;
+        lines.forEach(function (ln, li) { ctx.fillText(ln, textX, y + li * 48); });
+        y += (lines.length === 2 ? 200 : 150);
       });
       progress(ctx, 5, false);
     },

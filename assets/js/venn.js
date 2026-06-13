@@ -31,8 +31,9 @@
     opts = opts || {};
     var name = opts.name || "";
     var cx = GEO.vb / 2, r = GEO.r, off = GEO.off;
-    /* Diagramm-Mittelpunkt sitzt im oberen Bereich; darunter eine saubere Satz-Bühne. */
-    var cy = 250;
+    /* Diagramm-Mittelpunkt: genug Kopfraum, damit das obere Label (愛 + Begriffe)
+     * nicht an die viewBox-Oberkante stößt. */
+    var cy = 290;
     var seed = A.seedFromData(data);
     var rand = A.rng(seed);
     var inits = A.initials(name);
