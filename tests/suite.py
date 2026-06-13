@@ -230,6 +230,82 @@ try:
             # ein Slide-PNG hat 1080×1350
             sb = z.read(sorted(slides)[0])
             check(f"ZIP-Slide = 1080×1350 ({png_dims(sb)})", png_dims(sb) == (1080, 1350))
+
+        # ── Design-Review-Robustheit: Karussell + Venn überstehen lange/unbrechbare Texte ──
+        # (P1 + P2 aus dem externen Review: Slide-5-Ticks, Venn-Label-Overflow, Share-Footer)
+        LONG = {
+            "name": "Wolfgang-Maximilian",
+            "freuden": ["der erste Kaffee am Samstagmorgen, bevor wirklich alle wach sind und Lärm machen",
+                        "zehn ungestörte Minuten auf dem Balkon mit frischem Pfefferminztee, bevor ich anfange",
+                        "meine jüngere Schwester und mein kleiner privater Fotoblog mit genau zwölf Lesern"],
+            "kreise": {"liebe": ["Donaudampfschifffahrtsgesellschaftskapitän", "Bilder & Geschichten", "Erklären"],
+                       "staerke": ["Arbeitsablauforganisationsstrukturierung", "Ruhe im Chaos", "Verständlich machen"],
+                       "welt": ["Telekommunikationsüberwachungsverordnung", "Echtes Zuhören", "Gute Arbeit sichtbar"],
+                       "markt": ["Nahrungsmittelunverträglichkeitsberatung", "Foto-Reportagen", "Planungs-Wissen"]},
+            "zentrum": ("Du bringst eine fast schon übermenschliche Ordnung in jedes erdenkliche Chaos und machst "
+                        "dabei konsequent sichtbar, was den allermeisten anderen Menschen im Alltag vollständig entgeht.")}
+
+        # P1: Slide 5 — Pinsel-Tick liegt links neben dem Text, kein Layout-Bruch
+        s5 = pg.evaluate("""async (long) => {
+          await document.fonts.ready;
+          const erg = JSON.parse(JSON.stringify(window.LENA.ergebnis));
+          erg.carousel = { freuden: long.freuden };
+          const ctx2 = { profil: { name: long.name } };
+          const c = document.createElement('canvas');
+          window.IKIGAI_CAROUSEL.renderSlide(c, 5, erg, ctx2, null, 'card');
+          // Tick-Band liegt links (x<0.25W), Text startet rechts (>=0.27W) → kein Überlapp:
+          // wir prüfen, dass in der linken Tick-Spalte (x 170..250, y 480..520) rote Pixel sind
+          // und in derselben Höhe rechts davon (x 300..) dunkler Text — d.h. getrennte Zonen.
+          const g = c.getContext('2d');
+          const tick = g.getImageData(180, 486, 80, 8).data;   // Tick-Band, erste Zeile
+          let red = 0; for (let i=0;i<tick.length;i+=4){ if(tick[i]>180 && tick[i+1]<90 && tick[i+2]<90) red++; }
+          return { w: c.width, h: c.height, redInTickBand: red };
+        }""", LONG)
+        check(f"P1 Slide 5: roter Tick liegt im linken Tick-Band ({s5['redInTickBand']} px)", s5["redInTickBand"] > 0)
+        check("P1 Slide 5: Canvas-Maße 1080×1350 (kein Layout-Bruch)", (s5["w"], s5["h"]) == (1080, 1350))
+
+        # P2.3: Share-Slide 3 mit SEHR langem Satz — Hanko + Paginierung kollidieren NICHT.
+        # Footer (Paginierung) sitzt bei H-70=1280, Hanko-Mitte = 1280-64-46 = 1170, Unterkante 1216.
+        # Zwischen Hanko-Unterkante und Paginierung muss ein leerer Gurt liegen.
+        sq = pg.evaluate("""async (long) => {
+          await document.fonts.ready;
+          const W = 1080;
+          const erg = JSON.parse(JSON.stringify(window.LENA.ergebnis));
+          erg.zentrum = long.zentrum;
+          const ctx2 = { profil: { name: long.name } };
+          const c = document.createElement('canvas');
+          window.IKIGAI_CAROUSEL.renderSlide(c, 3, erg, ctx2, null, 'card');
+          const g = c.getContext('2d');
+          const band = g.getImageData(W/2-120, 1232, 240, 16).data;
+          let gapInk = 0; for (let i=0;i<band.length;i+=4){ if (band[i+3]>20 && (Math.abs(band[i]-25)>34||Math.abs(band[i+1]-34)>34||Math.abs(band[i+2]-54)>34)) gapInk++; }
+          const pag = g.getImageData(W/2-90, 1262, 180, 22).data;
+          let pagInk = 0; for (let i=0;i<pag.length;i+=4){ if (pag[i+3]>20 && (Math.abs(pag[i]-25)>20||Math.abs(pag[i+1]-34)>20||Math.abs(pag[i+2]-54)>20)) pagInk++; }
+          return { gapInk: gapInk, pagInk: pagInk };
+        }""", LONG)
+        check(f"P2.3 Share-Footer: Leergurt zwischen Hanko und Paginierung ({sq['gapInk']} ink-px)", sq["gapInk"] < 40)
+        check(f"P2.3 Share-Footer: Paginierung sichtbar & frei ({sq['pagInk']} ink-px)", sq["pagInk"] > 5)
+
+        # P2.1 + P2.2: Venn-SVG-Labels klippen die viewBox NIE — normal UND lange Wörter
+        lena_kreise = pg.evaluate("({ kreise: window.LENA.ergebnis.kreise, zentrum: window.LENA.ergebnis.zentrum })")
+        for tag, payload in [("normal", lena_kreise),
+                             ("lange Wörter", {"kreise": LONG["kreise"], "zentrum": LONG["zentrum"]})]:
+            clip = pg.evaluate("""(args) => {
+              const [data, name] = args;
+              const host = document.createElement('div'); host.style.position='absolute'; host.style.left='-9999px';
+              host.innerHTML = window.IKIGAI_VENN(data, { name });
+              document.body.appendChild(host);
+              const svg = host.querySelector('svg');
+              const vb = svg.getAttribute('viewBox').split(/\\s+/).map(Number);
+              const L = vb[0], R = vb[0]+vb[2];
+              let worst = 0;
+              svg.querySelectorAll('text.v-label, text.v-term, text.v-cap').forEach(t => {
+                const bb = t.getBBox();
+                worst = Math.max(worst, (L+4) - bb.x, (bb.x+bb.width) - (R-4));
+              });
+              host.remove();
+              return Math.round(worst);
+            }""", [payload, "Lena"])
+            check(f"P2.1/2.2 Venn-Labels innerhalb viewBox ({tag}, Überstand {clip}px)", clip <= 0)
         pg.close()
 
         # ── 2c · Permalink (#r=…) — Ergebnis komprimiert ins URL-Fragment ──
