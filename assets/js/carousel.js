@@ -148,25 +148,31 @@
     ctx.restore();
   }
 
-  function wrapDraw(ctx, text, x, y, maxW, lh, font, color, align) {
-    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "center";
-    var words = String(text).split(/\s+/), line = "", lines = [];
-    words.forEach(function (wd) {
-      if (ctx.measureText((line + " " + wd).trim()).width > maxW && line) { lines.push(line); line = wd; }
-      else line = (line + " " + wd).trim();
-    });
-    if (line) lines.push(line);
-    var startY = y - ((lines.length - 1) * lh) / 2;
-    /* zentriert: bei align==="center" überlange Einzelzeilen stauchen */
-    var c = (align || "center") === "center";
-    lines.forEach(function (l, i) {
-      if (c) fitLine(ctx, l, x, startY + i * lh, maxW);
-      else ctx.fillText(l, x, startY + i * lh);
-    });
-    return lines.length;
+  /* Wortumbruch mit echter Breitenmessung + Hard-Break unbrechbarer Wörter +
+   * stufenweiser Schrift-Verkleinerung (NIE horizontal stauchen — Review-P1-B:
+   * „Interdisziplinäre“ lief sonst zu unleserlich kondensierten Buchstaben zusammen).
+   * font = "<weight> <px>px <family>" — die px werden als Basisgröße verwendet,
+   * der Familienteil bleibt erhalten. */
+  function wrapDraw(ctx, text, x, y, maxW, lh, font, color, align, maxLines) {
+    var m = /(\d+(?:\.\d+)?)px/.exec(font);
+    var basePx = m ? parseFloat(m[1]) : 40;
+    var pre = font.slice(0, m ? m.index : 0);
+    var post = font.slice(m ? m.index + m[0].length : 0);
+    function makeFont(s) { return pre + Math.round(s) + "px" + post; }
+    var fit = A.fitWrap(ctx, text, maxW, maxLines || 6, makeFont, basePx, Math.max(20, Math.round(basePx * 0.5)));
+    ctx.font = makeFont(fit.size); ctx.fillStyle = color; ctx.textAlign = align || "center";
+    /* Zeilenhöhe proportional mitskalieren, wenn die Schrift geschrumpft wurde */
+    var scaledLh = lh * (fit.size / basePx);
+    var startY = y - ((fit.lines.length - 1) * scaledLh) / 2;
+    fit.lines.forEach(function (l, i) { ctx.fillText(l, x, startY + i * scaledLh); });
+    return fit.lines.length;
   }
 
+  /* beim Story-Export Paginierung weglassen: ein Einzel-Asset erbt sonst „03 — 06“,
+   * obwohl es kein 6er-Deck ist (P3). Flag wird im Story-Render gesetzt. */
+  var SUPPRESS_PAGINATION = false;
   function progress(ctx, n, dark) {
+    if (SUPPRESS_PAGINATION) return;
     ctx.textAlign = "center";
     ctx.fillStyle = dark ? A.hexA(P.paper, 0.6) : P.grau;
     ctx.font = "600 24px " + SANS;
@@ -213,12 +219,14 @@
         { l: "WORIN DU GUT BIST", w: d.dims.staerke, x: W * 0.27, y: 850 },
         { l: "WOFÜR MAN ZAHLT", w: d.dims.markt, x: W * 0.73, y: 850 }
       ];
-      /* überraschendstes Wort (liebe) in Siegelrot */
+      /* überraschendstes Wort (liebe) in Siegelrot. Breiteres Wort-Budget (430 px)
+       * + bis zu 3 Zeilen + tieferes Schrift-Minimum, damit lange Begriffe an
+       * Wortgrenzen umbrechen statt mitten im Wort hart zu trennen (Review-P1-B). */
       quad.forEach(function (q, i) {
         ctx.textAlign = "center";
         ctx.fillStyle = P.grau; ctx.font = "600 22px " + SANS; ls(ctx, 3);
         ctx.fillText(q.l, q.x, q.y); ls(ctx, 0);
-        wrapDraw(ctx, q.w || "—", q.x, q.y + 52, 330, 46, "600 40px " + SERIF, i === 0 ? P.accent : P.sumi, "center");
+        wrapDraw(ctx, q.w || "—", q.x, q.y + 52, 430, 46, "600 40px " + SERIF, i === 0 ? P.accent : P.sumi, "center", 3);
       });
       progress(ctx, 2, false);
     },
@@ -232,8 +240,13 @@
        * Paginierung an den unteren Rand quetschen (harter Mindest-Footer-Abstand). */
       var len = String(d.satz || "").length;
       var sz = len <= 90 ? 64 : len <= 150 ? 54 : len <= 220 ? 46 : 40;
-      var lh = Math.round(sz * 1.34), maxW = 880, maxLines = 7;
-      var lines = wrapLines(ctx, "„" + (d.satz || "") + "“", maxW, "600 " + sz + "px " + SERIF, maxLines);
+      var maxW = 880, maxLines = 7;
+      /* fitWrap: echtes Wort-Wrap + Hard-Break unbrechbarer Wörter + Schrift-Shrink,
+       * NIE horizontal stauchen (Review-P1-B). */
+      var fit = A.fitWrap(ctx, "„" + (d.satz || "") + "“", maxW, maxLines,
+        function (s) { return "600 " + Math.round(s) + "px " + SERIF; }, sz, Math.round(sz * 0.62));
+      var lines = fit.lines; sz = fit.size;
+      var lh = Math.round(sz * 1.34);
       /* Bottom-up-Layout mit garantierten Abständen:
        *   Footer (progress) bei H-70 · Hanko darüber (Gap >=70) · Satz darüber (Gap >=64) */
       var FOOTER_Y = H - 70, HANKO_R = 46;
@@ -244,7 +257,7 @@
       var startY = Math.min(satzBottom - blockH, (topRegion + satzBottom - blockH) / 2);
       startY = Math.max(startY, topRegion);              // nie ins Kicker-Feld
       ctx.textAlign = "center"; ctx.fillStyle = P.paper; ctx.font = "600 " + sz + "px " + SERIF;
-      lines.forEach(function (l, i) { fitLine(ctx, l, W / 2, startY + i * lh, maxW); });
+      lines.forEach(function (l, i) { ctx.fillText(l, W / 2, startY + i * lh); });
       /* kleines Hanko als Beglaubigung */
       var inits = A.initials(d.name);
       ctx.save();
@@ -276,14 +289,17 @@
       ctx.fillText("die dich schon heute tragen", W / 2, 330);
       /* Tick links, Text rechts — mit garantiertem Abstand dazwischen, damit der
        * Pinsel-Tick NIE über/in den Text läuft. Tick-Ende + Gap < Text-Anfang. */
-      var FONT5 = "500 38px " + SANS, LH5 = 48;
+      var BASE5 = 38;
       var tickX = W * 0.16, tickLen = W * 0.07;   // Tick-Band: 0.16W .. 0.23W
       var textX = W * 0.27;                         // Text startet sicher rechts vom Tick
       var maxW = W - textX - 110;                   // rechter Sicherheits-Rand
       var y = 500;
       d.freuden.forEach(function (f) {
-        /* sauberer Umbruch auf max. 2 Zeilen statt hartem „…“-Abschnitt */
-        var lines = wrapLines(ctx, String(f), maxW, FONT5, 2);
+        /* fitWrap: max. 2 Zeilen, unbrechbare lange Wörter werden hart gebrochen +
+         * die Schrift schrumpft, statt über den rechten Rand zu laufen (Review-P1). */
+        var fit = A.fitWrap(ctx, String(f), maxW, 2,
+          function (s) { return "500 " + Math.round(s) + "px " + SANS; }, BASE5, 26);
+        var lines = fit.lines, LH5 = Math.round(fit.size * 1.26);
         /* roter Pinsel-Tick: auf der optischen Mitte der ERSTEN Textzeile (≈ y - 12),
          * waagerecht links neben dem Text, kein Überlappen mehr. */
         var tickY = y - 12;
@@ -294,7 +310,7 @@
         ctx.quadraticCurveTo(tickX + tickLen * 0.5, tickY - 7, tickX + tickLen, tickY);
         ctx.stroke(); ctx.restore();
         /* Text */
-        ctx.textAlign = "left"; ctx.fillStyle = P.sumi; ctx.font = FONT5;
+        ctx.textAlign = "left"; ctx.fillStyle = P.sumi; ctx.font = "500 " + Math.round(fit.size) + "px " + SANS;
         lines.forEach(function (ln, li) { ctx.fillText(ln, textX, y + li * LH5); });
         y += (lines.length === 2 ? 200 : 150);
       });
@@ -356,7 +372,8 @@
       var tctx = tmp.getContext("2d");
       var dark = (n === 3);
       paper(tctx, W, H, dark);
-      SLIDES[n](tctx, d, logo);
+      SUPPRESS_PAGINATION = true;
+      try { SLIDES[n](tctx, d, logo); } finally { SUPPRESS_PAGINATION = false; }
       paper(ctx, w, h, dark);
       ctx.drawImage(tmp, 0, (h - H) / 2);
     } else {
