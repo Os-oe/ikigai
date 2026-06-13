@@ -45,7 +45,15 @@
     var satzTop = bottomLabelEnd + 54;
     var vh = satzTop + satzLines.length * fit.lh + 28;
 
-    var svg = '<svg viewBox="0 0 ' + GEO.vb + ' ' + Math.round(vh) +
+    /* Horizontale Sicherheits-Gutter: die seitlichen Kapitälchen-Labels
+     * („WORIN DU GUT BIST“ / „WAS DIE WELT BRAUCHT“) sind breiter als die Kreise
+     * und liefen sonst links/rechts aus der viewBox (auf Mobile sichtbar
+     * abgeschnitten). viewBox links/rechts um padX erweitern → garantierter
+     * Innenabstand, Diagramm bleibt zentriert. */
+    var padX = 60;
+    var vbw = GEO.vb + padX * 2;
+
+    var svg = '<svg viewBox="' + (-padX) + ' 0 ' + vbw + ' ' + Math.round(vh) +
       '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dein persönliches Ikigai-Diagramm">';
 
     /* Filter: Faserkante (Tusche) + Saum-Gradienten je Kreis */
@@ -80,6 +88,29 @@
       return { x: bx + ci.dx * (r * 0.72), y: by + ci.dy * (r * 0.82) };
     }
 
+    /* Breiten-Budget je Label-Block (zentriert): die schmalste Hälfte zwischen
+     * Anker und dem nächstgelegenen harten Rand (viewBox-Kante mit Gutter bzw.
+     * Zentrum-Plakette). Damit überschreitet KEIN Label — auch sehr lange/
+     * unbrechbare Wörter — die viewBox oder läuft ins Zentrum. */
+    function budget(ci, ax) {
+      if (ci.dx === 0) return vbw - 48;                  // oben/unten: fast volle Breite
+      var leftEdge = -padX + 24, rightEdge = GEO.vb + padX - 24;
+      var plL = cx - 56, plR = cx + 56;                  // Plaketten-Sperrzone
+      var half = ci.dx < 0
+        ? Math.min(ax - leftEdge, plL - ax)              // links
+        : Math.min(rightEdge - ax, ax - plR);            // rechts
+      return Math.max(2 * half, 90);
+    }
+    /* grobe Breiten-Schätzung (px) für conditional textLength-Stauchung */
+    function estW(text, perChar) { return String(text).length * perChar; }
+    /* gibt das textLength/lengthAdjust-Attribut zurück, NUR wenn nötig (sonst leer,
+     * damit kurze Labels nicht künstlich gestreckt werden). */
+    function clampAttr(text, perChar, budgetW) {
+      var w = estW(text, perChar);
+      if (w <= budgetW) return "";
+      return ' textLength="' + Math.round(budgetW) + '" lengthAdjust="spacingAndGlyphs"';
+    }
+
     /* ── Lasur-Blobs (Multiply, isoliert) ── */
     svg += '<g style="isolation:isolate">';
     GEO.circles.forEach(function (ci, i) {
@@ -112,15 +143,19 @@
     /* ── Labels außen + Kanji-Marker + Begriffe ── */
     GEO.circles.forEach(function (ci) {
       var a = anchor(ci);
+      var bud = budget(ci, a.x);
       var terms = (data.kreise && data.kreise[ci.key]) || [];
       svg += '<g class="venn-t" text-anchor="middle">';
       svg += '<text class="v-kanji" x="' + a.x + '" y="' + (a.y - 30) + '">' + A.KANJI[ci.key] + '</text>';
-      svg += '<text class="v-label" x="' + a.x + '" y="' + (a.y - 8) + '">' + esc(ci.label) + '</text>';
+      /* Versalien-Label (mit Tracking) — bei Überlänge auf das Budget stauchen */
+      svg += '<text class="v-label" x="' + a.x + '" y="' + (a.y - 8) + '"' +
+        clampAttr(ci.label, 9.2, bud) + '>' + esc(ci.label) + '</text>';
       terms.slice(0, 3).forEach(function (t, k) {
-        svg += '<text class="v-term" x="' + a.x + '" y="' + (a.y + 12 + k * 17) + '">' + esc(t) + '</text>';
+        svg += '<text class="v-term" x="' + a.x + '" y="' + (a.y + 12 + k * 17) + '"' +
+          clampAttr(t, 7.2, bud) + '>' + esc(t) + '</text>';
       });
-      svg += '<text class="v-cap" x="' + a.x + '" y="' + (a.y + 12 + Math.min(terms.length, 3) * 17 + 4) + '">' +
-        esc(A.FARBNAMEN[ci.key]) + '</text>';
+      svg += '<text class="v-cap" x="' + a.x + '" y="' + (a.y + 12 + Math.min(terms.length, 3) * 17 + 4) + '"' +
+        clampAttr(A.FARBNAMEN[ci.key], 5.6, bud) + '>' + esc(A.FARBNAMEN[ci.key]) + '</text>';
       svg += '</g>';
     });
 

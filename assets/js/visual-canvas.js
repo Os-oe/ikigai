@@ -31,6 +31,19 @@
     ctx.closePath();
   }
 
+  /* Zentrierter Text, der bei Überlänge horizontal gestaucht wird (statt über die
+   * Kreis-Grenzen / aus dem Bild zu laufen). budget = max. Breite in px. Sehr lange
+   * unbrechbare Wörter werden so eng gesetzt, aber bleiben innerhalb der Grenze. */
+  function fitText(ctx, text, x, y, budget) {
+    var w = ctx.measureText(text).width;
+    if (w <= budget || w <= 0) { ctx.fillText(text, x, y); return; }
+    var s = budget / w;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, 1); ctx.translate(-x, -y);
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
   /* Nur das Diagramm (Blobs + Plakette + Hanko + Labels), zentriert auf (cx0,cy0).
    * opts.ghost = blasses Geister-Venn (Karussell-Slide 2), opts.noCenter = ohne Plakette. */
   window.IKIGAI_DRAW_DIAGRAM = function (ctx, data, cx0, cy0, size, opts) {
@@ -88,9 +101,22 @@
     /* ── Labels außen + Kanji + Begriffe ── */
     if (opts.noLabels || ghost) return;
     ctx.textAlign = "center";
+    /* Breiten-Budget je Label-Block (zentriert): die schmalste Hälfte zwischen
+     * Anker und nächstem harten Rand (Cluster-Außenkante bzw. Zentrum-Plakette).
+     * Lange/unbrechbare Wörter werden gestaucht statt über die Kreise zu laufen. */
+    var plHalf = 56 * k;                                  // Plaketten-Sperrzone (halb)
+    function labelBudget(ci, ax) {
+      if (ci.dx === 0) return 2 * (r + off) * 0.96;        // oben/unten: volle Clusterbreite
+      var outerHalf = (r + off) * 0.98;                    // bis Cluster-Außenkante
+      var half = ci.dx < 0
+        ? Math.min(ax - (cx0 - outerHalf), (cx0 - plHalf) - ax)
+        : Math.min((cx0 + outerHalf) - ax, ax - (cx0 + plHalf));
+      return Math.max(2 * half, 80 * k);
+    }
     GEO.circles.forEach(function (ci) {
       var cx = cx0 + ci.dx * off, cy = cy0 + ci.dy * off;
       var ax = cx + ci.dx * (r * 0.74), ay = cy + ci.dy * (r * 0.78);
+      var bud = labelBudget(ci, ax);
       var terms = (data.kreise && data.kreise[ci.key]) || [];
       ctx.fillStyle = A.hexA(P.grau, 0.55);
       ctx.font = "400 " + Math.round(26 * k) + "px " + SERIF;
@@ -98,14 +124,14 @@
       ctx.fillStyle = P.grau;
       ctx.font = "600 " + Math.round(13 * k) + "px " + SANS;
       setLS(ctx, 0.28 * 13 * k);
-      ctx.fillText(ci.label.toUpperCase(), ax, ay - 8 * k);
+      fitText(ctx, ci.label.toUpperCase(), ax, ay - 8 * k, bud);
       setLS(ctx, 0);
       ctx.fillStyle = P.sumi;
       ctx.font = "500 " + Math.round(13 * k) + "px " + SANS;
-      terms.slice(0, 3).forEach(function (t, i) { ctx.fillText(t, ax, ay + (12 + i * 17) * k); });
+      terms.slice(0, 3).forEach(function (t, i) { fitText(ctx, t, ax, ay + (12 + i * 17) * k, bud); });
       ctx.fillStyle = P.grau;
       ctx.font = "italic 400 " + Math.round(11 * k) + "px " + SERIF;
-      ctx.fillText(A.FARBNAMEN[ci.key], ax, ay + (12 + Math.min(terms.length, 3) * 17 + 4) * k);
+      fitText(ctx, A.FARBNAMEN[ci.key], ax, ay + (12 + Math.min(terms.length, 3) * 17 + 4) * k, bud);
     });
   };
 

@@ -136,6 +136,18 @@
     return lines.slice(0, maxLines);
   }
 
+  /* Zentrierter Text, der bei Überlänge horizontal gestaucht wird — verhindert,
+   * dass einzelne unbrechbare Wörter über die maxW-Grenze hinauslaufen. */
+  function fitLine(ctx, text, x, y, maxW) {
+    var w = ctx.measureText(text).width;
+    if (w <= maxW || w <= 0) { ctx.fillText(text, x, y); return; }
+    var s = maxW / w;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, 1); ctx.translate(-x, -y);
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
   function wrapDraw(ctx, text, x, y, maxW, lh, font, color, align) {
     ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || "center";
     var words = String(text).split(/\s+/), line = "", lines = [];
@@ -145,7 +157,12 @@
     });
     if (line) lines.push(line);
     var startY = y - ((lines.length - 1) * lh) / 2;
-    lines.forEach(function (l, i) { ctx.fillText(l, x, startY + i * lh); });
+    /* zentriert: bei align==="center" überlange Einzelzeilen stauchen */
+    var c = (align || "center") === "center";
+    lines.forEach(function (l, i) {
+      if (c) fitLine(ctx, l, x, startY + i * lh, maxW);
+      else ctx.fillText(l, x, startY + i * lh);
+    });
     return lines.length;
   }
 
@@ -211,12 +228,27 @@
       ctx.fillStyle = A.hexA(P.paper, 0.5); ctx.textAlign = "center";
       ctx.font = "600 26px " + SANS; ls(ctx, 5);
       ctx.fillText("DEIN IKIGAI IN EINEM SATZ", W / 2, 230); ls(ctx, 0);
-      var n = wrapDraw(ctx, "„" + d.satz + "“", W / 2, 660, 880, 86, "600 64px " + SERIF, P.paper, "center");
+      /* Satzgröße nach Länge staffeln, damit lange Sätze nicht das Hanko + die
+       * Paginierung an den unteren Rand quetschen (harter Mindest-Footer-Abstand). */
+      var len = String(d.satz || "").length;
+      var sz = len <= 90 ? 64 : len <= 150 ? 54 : len <= 220 ? 46 : 40;
+      var lh = Math.round(sz * 1.34), maxW = 880, maxLines = 7;
+      var lines = wrapLines(ctx, "„" + (d.satz || "") + "“", maxW, "600 " + sz + "px " + SERIF, maxLines);
+      /* Bottom-up-Layout mit garantierten Abständen:
+       *   Footer (progress) bei H-70 · Hanko darüber (Gap >=70) · Satz darüber (Gap >=64) */
+      var FOOTER_Y = H - 70, HANKO_R = 46;
+      var hy = FOOTER_Y - 64 - HANKO_R;                  // Hanko-Mitte, >=64 px über dem Footer-Text
+      var satzBottom = hy - HANKO_R - 70;                // Satz-Unterkante, >=70 px über dem Hanko
+      var blockH = (lines.length - 1) * lh;
+      var topRegion = 300;                               // unter dem Kicker
+      var startY = Math.min(satzBottom - blockH, (topRegion + satzBottom - blockH) / 2);
+      startY = Math.max(startY, topRegion);              // nie ins Kicker-Feld
+      ctx.textAlign = "center"; ctx.fillStyle = P.paper; ctx.font = "600 " + sz + "px " + SERIF;
+      lines.forEach(function (l, i) { fitLine(ctx, l, W / 2, startY + i * lh, maxW); });
       /* kleines Hanko als Beglaubigung */
       var inits = A.initials(d.name);
-      var hy = 660 + (n / 2) * 86 + 130;
       ctx.save();
-      ctx.beginPath(); ctx.arc(W / 2, hy, 46, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(W / 2, hy, HANKO_R, 0, Math.PI * 2);
       ctx.fillStyle = A.hexA(P.accent, 0.92); ctx.fill();
       ctx.fillStyle = P.paper; ctx.font = "700 38px " + SANS; ctx.textAlign = "center";
       ctx.fillText(inits, W / 2, hy + 14);
