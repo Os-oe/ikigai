@@ -41,6 +41,55 @@
 | 3 Polish | ✅ | PASS — Suite 2× grün (56/56), Mobile 390×844 ohne H-Scroll, Erst-Load 243 KB. Selbst-Urteil: ja, würde ich benutzen — Wortspiel leise (nur Logo-Akzent), Design ruhig, Flow ~10 Min. Commit 51133fc |
 | 4 Ship | ✅ | PASS — live_suite 2× grün (18/18) gegen https://ikigai.demo.osai.solutions inkl. echtem Synthese-Call, Zitate 3/3 wörtlich. GitHub Os-oe/ikigai, Vercel git connect, Domain attached. Commit 9a9c612 |
 | 5 Excellence | ✅ | PASS — 10 Schwächen dokumentiert, Top 5 gefixt, Re-Deploy, Suite 2× grün (58/58 lokal) + live_suite 2× grün (18/18) |
+| 6 Redesign | ✅ | PASS — Design-Brief vollständig umgesetzt, suite.py 2× grün (74/74 lokal) + live_suite 2× grün (24/24), deployed. Commits 592fb16…52ef8a7 |
+
+## Redesign-Abschnitt (13.06.2026 — visuelles Redesign nach DESIGN-BRIEF.md)
+
+> Quelle: `agent-studio/.planning/one-prompt/ikigai/redesign/DESIGN-BRIEF.md` (verbindlich).
+> Autonome Build-Session, keine Rückfragen. Vorarbeit der vorigen Session (Commits 592fb16 + 6fe1491:
+> Lasur-Venn, Wrapped-Karussell, Held-Satz-Share, inszenierte Warte-Sequenz) wurde fortgesetzt.
+
+**Umgesetzt — je Baustein:**
+
+- **Venn-Visual (SVG + Canvas):** Lasur-Multiply-Venn (keine Outlines), organische seeded Blobs (jeder User ein Unikat),
+  Aquarell-Saum (Radialgradient), Misregistration; saubere Center-Plakette + Hanko mit Initialen, Satz GROSS als Held
+  darunter (Tuschlinie ans Siegel), 4 Labels außen + Kanji-Marker (愛技世価) + Farbnamen-Legende. Diagramm-Mittelpunkt
+  tiefer gesetzt (cy 250→290), damit das obere Label nicht an die viewBox-Oberkante stößt. SVG (`venn.js`) + Canvas
+  (`visual-canvas.js`) teilen die Geometrie/Palette aus `ikigai-art.js` → pixel-nah identisch. Mit kurzen UND langen
+  Begriffen geprüft (Overflow-Stresstest „Maximiliana"-Persona): kein Überlauf.
+- **PDF Premium-Workbook (`pdf.js`):** Hybrid jsPDF-Vektor-Text + Canvas-Kunstebenen. **Shippori Mincho als TTF
+  eingebettet** (`assets/vendor/shippori-pdf-fonts.js`, lazy via loadVendor — kein Times mehr), Washi-JPEG-Textur,
+  Hanko-PNG, Venn als hochauflösendes Canvas-Bild. 11 Seiten (Cover-Hinomaru, Satz-Seite, Venn, 4 Dimensionen,
+  Score+Alltag, Kaizen, wahre Geschichte, Okuzuke-Kolophon). Editorial/Ma: asymmetrischer Satzspiegel, 3-Stimmen-Typo,
+  Haarlinien, Hashira-Marginalie (90°), Kintsugi-Goldfaden, Mon-Signet-Fußzeile, 3–4 mm Siegelrot-Zitatblock. **674 KB
+  (< 1 MB), Text selektierbar.** Bug-Fixes dieser Session: Label/Display-Baseline-Kollision (S3/S8/S10), Satz-Seite
+  width-clamp gegen Überlauf, Dimensions-Seiten zu Vollkompositionen (großer Lasur-Blob + Kanji-Wasserzeichen statt
+  halbleer — löst AUDIT #1), Kaizen auf eine Seite verdichtet (12→11 Seiten).
+- **Share-Karussell (`carousel.js`):** 6 Slides @1080×1350 (Wrapped-Dramaturgie), Slide 3 (der Satz, invertiert dunkel +
+  Hanko) = Default-Einzel-Share. Export-ZIP = 6 PNGs + Story-Crop + LinkedIn-PDF (eigener Mini-ZIP-Writer + jsPDF).
+  HTML/Canvas-Render, 0 € Assets. Slide-5-Freuden: sauberer 2-Zeilen-Umbruch + auf ~7 Wörter verdichtet (statt hartem
+  „…"-Abschnitt).
+- **Ergebnis-Seite + Flow (`result.js`, `wizard.js`, `style.css`):** choreografierte Scroll-Erzählung mit Rhythmuswechseln
+  (Aijiro-Kühlblock + dunkler Kon-Block brechen die Beige-Monotonie, AUDIT #18), differenziertes Karten-Vokabular
+  (Zitat-/Ideen-/Alltags-/Kaizen-Karten, AUDIT #19), fühlbare Washi-Textur (mehrlagiges feTurbulence + Lichtverlauf,
+  AUDIT #20), Score als dickerer Datengrafik-Ring + Vorher/Nachher-Delta, .ics-30-Tage-Wiedermessung. Warte-Screen:
+  großer prominenter Ensō, echte User-Worte in der Status-Sequenz, Footer ausgeblendet (AUDIT #24), Typewriter-Reveal
+  + Scroll-Lock. **Wizard-Piping (P2):** an 3 Fragen wird eine frühere Antwort wörtlich aufgegriffen.
+- **Permalink `#r=` (P1):** Ergebnis via lz-string (`assets/vendor/lz-string.min.js`) komprimiert ins URL-Fragment
+  (~4,4 KB), „Link kopieren"-Button, Boot-Pfad öffnet das Ergebnis direkt. **Fragment geht nie zum Server** →
+  Datenschutz-Versprechen bleibt wörtlich wahr. Kein Backend.
+- **API (`synthesize.js`):** optionales `carousel`-Feld (kuratierte teilbare Verdichtung, harter Privacy-Filter im
+  Prompt: kein Geld/Defizit/Therapie-Ton) — **abwärtskompatibel**: fehlt es, leitet der Client die Slides aus dem
+  normalen Ergebnis ab (Fallback in `carousel.js`). Schutzschicht/Caps unverändert.
+
+**Bewusste Auslassungen:** P3 (Druck-Poster A3, Sound-Toggle) — Monetarisierungs-/Later-Items, risikoarm aber außerhalb
+des Kern-Scopes; nicht gebaut. PDF blieb bei 11 Seiten statt 8–9 (Brief-Ziel): bewusst, weil die harte Brief-Regel
+„keine halbleeren Seiten" Vorrang hat — 11 volle/bewusst-inszenierte Seiten schlagen 9 mit Dead-Zones.
+
+**Gates:** Visuelle Gates je Baustein per Screenshot/Read geprüft (PDF-Seiten einzeln, alle 6 Karussell-Slides einzeln,
+Venn kurz+lang, Mobile 390×844). suite.py **74/74 lokal 2× grün**, live_suite **24/24 2× grün** gegen
+https://ikigai.demo.osai.solutions inkl. echtem Gemini-Call (Zitate 3/3 wörtlich). Erst-Load 314 KB (< 400 KB).
+Kosten Redesign: ~0 € (alles Code/SVG/Canvas; nur 2 Live-Gemini-Calls der Suite ~0,01 €).
 
 ## Protokoll
 

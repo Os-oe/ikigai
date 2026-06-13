@@ -59,6 +59,33 @@ wiederverwendbar für künftige Wizard-/Live-KI-Projekte.
 - „OsAI-Orange" gibt es nicht: Brand-Akzent ist Siegelrot `#F6303A` (logo-mark.png /
   brand-card.json) — passt als Hanko-Akzent perfekt zu Washi/Tusche.
 
+## Redesign (13.06.2026) — Premium-Workbook + Karussell + Permalink
+
+- **jsPDF `d.text(lines, x, y)` setzt y als BASELINE**, nicht als Oberkante. Nach einem kleinen Label direkt eine große
+  Mincho-Display-Zeile mit demselben y → die Versalien laufen NACH OBEN ins Label. Fix: vor dem Zeichnen `y += size*0.34`
+  (Versalhöhe als Vorlauf). Trat an 3 Seiten gleichzeitig auf (S3/S8/S10) — ein Helfer-Bug, drei Symptome.
+- **Poem-Break im PDF MUSS width-clampen, nicht nur Zeichen zählen.** Sinneinheiten-Umbruch (Komma/Gedankenstrich) reicht
+  nicht — eine lange erste Sinneinheit läuft über den rechten Rand. `d.getTextWidth()` pro Zeile prüfen + Wort-Hardwrap
+  via `splitTextToSize` als Fallback. Zusätzlich Satzgröße nach Länge staffeln (22/19/17 pt).
+- **„Eine Idee pro Seite" + „keine halbleeren Seiten" sind im PDF ein Widerspruch — gewinnt: keine Halbleere.** Eine
+  Dimension mit 2 Absätzen + Zitat füllt keine A4-Seite. Lösung: die Seite zur Vollkomposition machen — großer
+  halbtransparenter Lasur-Blob (Bildgewicht unten) + riesiges blasses Kanji-Wasserzeichen. Aus „läuft ins Nichts" wird
+  „bewusst inszenierte Bühne". Lieber 11 volle Seiten als 9 mit Dead-Zones.
+- **Canvas-Text sauber kürzen statt hart `.slice(33)+"…"`.** Wrapped-Karussell-Listen: auf max. N Zeilen umbrechen, die
+  letzte Zeile per `measureText` schrittweise kürzen bis sie + „…" passt. Hartes Slice mitten im Wort liest als kaputt,
+  nicht als kuratiert. Quell-Content vorher an erster Sinngrenze (Komma/—) auf ~7 Wörter verdichten.
+- **Permalink ohne Backend = lz-string `compressToEncodedURIComponent` ins `#fragment`.** Das Fragment geht NIE zum
+  Server (HTTP lässt es weg) → das „nichts wird gespeichert"-Versprechen bleibt wörtlich wahr. Ergebnis-JSON (~4,4 KB
+  komprimiert) gut unter URL-Limits. Boot-Pfad liest `#r=` mit Vorrang vor localStorage/Demo. URL-safe-Subset reicht
+  (keine `%`-Escapes → sauber teilbar).
+- **Neues optionales LLM-Feld immer abwärtskompatibel einführen:** Schema-Property NICHT in `required`, im Prompt
+  beschreiben, im Cleanup defensiv mappen, und der Client braucht einen Fallback (hier: `carousel.js` leitet die Slides
+  aus dem Normal-Ergebnis ab, wenn `erg.carousel` fehlt). So bricht kein alter Permalink/Cache.
+- **Bei einem Redesign zuerst den IST-Stand rendern und ansehen, nicht den Code raten.** Die Vorsession hatte 80 %
+  gebaut; die echten Restarbeiten (PDF-Bugs, fehlender Permalink, stale Tests) fand erst der Screenshot-Durchlauf.
+  Tests waren auf das ALTE Design geeicht (PDF==6 Seiten, Share 1080×1080) und hätten grün-trügerisch falsche Zahlen
+  zementiert — Test-Update gehört zwingend zum Redesign.
+
 ## Kosten (Ist)
 
 | Posten | Menge | Ist |
