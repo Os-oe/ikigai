@@ -108,6 +108,27 @@ try:
         pg.click("#start-btn")
         pg.wait_for_selector("#screen-wizard:not([hidden])")
 
+        # Review-P2.2: der Frage-Block muss vertikal zentriert sitzen (nicht im oberen
+        # Drittel kleben mit großer leerer Mitte + tief schwebender Nav). Auf 900px
+        # Desktop soll die Karten-Mitte nahe der Viewport-Mitte liegen, die Nav unten.
+        pg.wait_for_timeout(120)
+        bal = pg.evaluate("""() => {
+          const stage = document.getElementById('wizard-stage');
+          const card = stage.firstElementChild;
+          const nav = document.querySelector('.wizard-nav');
+          const r = el => el.getBoundingClientRect();
+          const vh = window.innerHeight;
+          const cardMid = (r(card).top + r(card).bottom) / 2;
+          return { vh, cardMid: Math.round(cardMid), navTop: Math.round(r(nav).top),
+                   offFromCenter: Math.round(Math.abs(cardMid - vh / 2)) };
+        }""")
+        # Karten-Mitte höchstens ~12% der Höhe von der Viewport-Mitte entfernt
+        check(f"P2.2 Wizard: Frage-Block vertikal zentriert (Mitte {bal['cardMid']}, Δ {bal['offFromCenter']}px)",
+              bal["offFromCenter"] <= bal["vh"] * 0.12)
+        # Nav sitzt im unteren Viewtel — nicht knapp unter der Karte
+        check(f"P2.2 Wizard: Nav unten verankert (navTop {bal['navTop']} ≥ {round(bal['vh']*0.78)})",
+              bal["navTop"] >= bal["vh"] * 0.78)
+
         antw = LENA["antworten"]
         guard = 0
         while guard < 60:
@@ -195,6 +216,47 @@ try:
         check("PDF: Shippori Mincho als TTF eingebettet (kein Times)",
               b"Mincho" in data and b"FontFile2" in data)
         check("PDF-Dateiname personalisiert", "lena" in dl.value.suggested_filename)
+
+        # Review-P2.1: der getönte Dimensions-Kreis muss auf JEDER der 4 Kreis-Seiten
+        # erkennbar farbig sein. Der dunkle Ruri-Blau-Kreis (S „Können“) erschien mit
+        # einheitlichem alpha=0.16 über dem warmen Washi fast neutral-grau (Hue kippte
+        # auf den Papier-Ton). Pro-Pigment-tintAlpha behebt das. Hier rasterisieren +
+        # die Sättigung des Blob-Zentrums je Kreis-Seite messen.
+        try:
+            import fitz, colorsys
+            doc = fitz.open(stream=data, filetype="pdf")
+            # Die 4 Dimensions-Spreads folgen auf Cover(1)/Satz(2)/Venn(3): Seiten 4–7
+            # in Reihenfolge Lieben(Rose)·Können(Blau)·Wirken(Grün)·Wert(Goldbraun).
+            # Blob-Mitte je Seite bei (0.74W, 0.66H) abtasten.
+            def hue_sat(page_idx):
+                pm = doc[page_idx].get_pixmap(dpi=96)
+                px, py = int(pm.width * 0.74), int(pm.height * 0.66)
+                rs = gs = bs = n = 0
+                for dx in range(-10, 11, 5):
+                    for dy in range(-10, 11, 5):
+                        p = pm.pixel(px + dx, py + dy); rs += p[0]; gs += p[1]; bs += p[2]; n += 1
+                h, s, v = colorsys.rgb_to_hsv(rs / n / 255, gs / n / 255, bs / n / 255)
+                return round(h * 360), round(s * 100)
+            # erwartete Hue-Familien (Toleranzfenster)
+            dim_pages = {"Rose": (3, (0, 35)), "Blau": (4, (190, 250)),
+                         "Grün": (5, (40, 160)), "Goldbraun": (6, (20, 55))}
+            samples = {nm: hue_sat(idx) for nm, (idx, _) in dim_pages.items()}
+            doc.close()
+            # Blau-Kreis (Ruri) liest als Blau (Hue 190–250°), nicht als neutrales Grau (sat ≥5%)
+            bh, bs_ = samples["Blau"]
+            check(f"P2.1 PDF: Blau-Kreis (Ruri) liest als Blau, nicht Grau (hue {bh}°, sat {bs_}%)",
+                  190 <= bh <= 250 and bs_ >= 5)
+            # alle 4 Kreis-Spreads tragen echte, erkennbare Farbe (keiner kippt auf ~neutral)
+            allok = all(s >= 5 and lo <= h <= hi
+                        for nm, (idx, (lo, hi)) in dim_pages.items()
+                        for (h, s) in [samples[nm]])
+            check(f"P2.1 PDF: alle 4 Kreis-Spreads sichtbar + richtig getönt {samples}", allok)
+        except ImportError:
+            # Fallback ohne Rasterizer: Quell-Garantie — dunkles Pigment kräftiger gedeckt
+            pdf_src = open(os.path.join(ROOT, "assets/js/pdf.js"), encoding="utf-8").read()
+            m = re.search(r'key:\s*"staerke".*?tintAlpha:\s*([\d.]+)', pdf_src)
+            check("P2.1 PDF: Ruri-Blau-Kreis mit erhöhtem tintAlpha (>0.16)",
+                  bool(m) and float(m.group(1)) > 0.16)
 
         def png_dims(b):
             return int.from_bytes(b[16:20], "big"), int.from_bytes(b[20:24], "big")
@@ -306,6 +368,36 @@ try:
               return Math.round(worst);
             }""", [payload, "Lena"])
             check(f"P2.1/2.2 Venn-Labels innerhalb viewBox ({tag}, Überstand {clip}px)", clip <= 0)
+
+            # Review-P1: ein Label darf optisch nie WEIT über seinen Kreis hinauslaufen.
+            # Das viewBox-Gate griff hier nicht (Text blieb im Bild, lief aber bis fast
+            # an die Kante). Hier gegen den KREIS-Fußabdruck prüfen: Oben/Unten-Labels
+            # (auf den Kreis zentriert) dürfen max. ~14px über den Kreisrand, Seiten-
+            # Labels sitzen als äußere Marginalie und dürfen weiter raus (≤ r·0.9).
+            foot = pg.evaluate("""(args) => {
+              const [data, name] = args;
+              const host = document.createElement('div'); host.style.position='absolute'; host.style.left='-9999px';
+              host.innerHTML = window.IKIGAI_VENN(data, { name });
+              document.body.appendChild(host);
+              const svg = host.querySelector('svg');
+              const GEO = window.IKIGAI_ART.GEO, cx = GEO.vb/2, cy = 290, r = GEO.r, off = GEO.off;
+              const circ = {}; GEO.circles.forEach(c => circ[c.key] = { cx: cx + c.dx*off, cy: cy + c.dy*off, dx: c.dx });
+              let topBottom = 0, side = 0;
+              svg.querySelectorAll('text.v-label, text.v-term, text.v-cap').forEach(t => {
+                const bb = t.getBBox(); const mx = bb.x + bb.width/2, my = bb.y + bb.height/2;
+                let best=null, bd=1e9; for (const k in circ){const c=circ[k];const d=Math.hypot(mx-c.cx,my-c.cy);if(d<bd){bd=d;best=k;}}
+                const c = circ[best];
+                const over = Math.max((c.cx - r) - bb.x, (bb.x + bb.width) - (c.cx + r)); // px über Kreisrand
+                if (c.dx === 0) topBottom = Math.max(topBottom, over);
+                else side = Math.max(side, over);
+              });
+              host.remove();
+              return { topBottom: Math.round(topBottom), side: Math.round(side), r: r };
+            }""", [payload, "Lena"])
+            check(f"P1 Venn: Oben/Unten-Label innerhalb Kreis-Fußabdruck ({tag}, +{foot['topBottom']}px)",
+                  foot["topBottom"] <= 14)
+            check(f"P1 Venn: Seiten-Label bleibt nahe am Kreis ({tag}, +{foot['side']}px ≤ {round(foot['r']*0.9)})",
+                  foot["side"] <= foot["r"] * 0.9)
         pg.close()
 
         # ── 2c · Permalink (#r=…) — Ergebnis komprimiert ins URL-Fragment ──
