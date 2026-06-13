@@ -18,12 +18,15 @@
     return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  /* Satz-Größe nach Länge staffeln (großer Held unter dem Diagramm) */
+  /* Satz-Größe nach Länge staffeln (großer Held unter dem Diagramm). maxLines
+   * großzügig, damit lange Sätze vollständig stehen statt mit „…“ abgeschnitten
+   * zu werden (Review-Long-Text-Gate). */
   function satzFit(text) {
     var n = String(text || "").length;
-    if (n <= 70) return { size: 26, chars: 26, lh: 34 };
-    if (n <= 110) return { size: 22, chars: 30, lh: 29 };
-    return { size: 19, chars: 34, lh: 25 };
+    if (n <= 70) return { size: 26, chars: 26, lh: 34, maxLines: 4 };
+    if (n <= 110) return { size: 22, chars: 30, lh: 29, maxLines: 5 };
+    if (n <= 170) return { size: 19, chars: 34, lh: 25, maxLines: 6 };
+    return { size: 17, chars: 38, lh: 23, maxLines: 7 };
   }
 
   /* SVG bauen. data = ergebnis (kreise, schnittmengen, zentrum) */
@@ -38,11 +41,14 @@
     var rand = A.rng(seed);
     var inits = A.initials(name);
 
-    /* Unterkante des Diagramm-Clusters inkl. Bottom-Label-Block */
+    /* Unterkante des Diagramm-Clusters inkl. Bottom-Label-Block. Der Bottom-Block
+     * kann jetzt mehrzeilig sein (Label bis 2 Zeilen + 3 Begriffe à bis 2 Zeilen +
+     * Legende). Konservativer Worst-Case, damit der Satz darunter nie kollidiert. */
     var fit = satzFit(data.zentrum);
-    var satzLines = A.wrap("„" + (data.zentrum || "") + "“", fit.chars, 4);
-    var bottomLabelEnd = cy + off + r * 0.78 + 12 + 3 * 17 + 10; /* Begriffe + Farb-Legende */
-    var satzTop = bottomLabelEnd + 54;
+    var satzLines = A.wrap("„" + (data.zentrum || "") + "“", fit.chars, fit.maxLines);
+    var bottomAnchorY = cy + off + r * 0.82;
+    var bottomLabelEnd = bottomAnchorY + 2 * 16 + 7 + 3 * (2 * 16 + 5) + 18; /* Label + 3×2-zeilig + Legende */
+    var satzTop = bottomLabelEnd + 50;
     var vh = satzTop + satzLines.length * fit.lh + 28;
 
     /* Horizontale Sicherheits-Gutter: die seitlichen Kapitälchen-Labels
@@ -53,7 +59,13 @@
     var padX = 60;
     var vbw = GEO.vb + padX * 2;
 
-    var svg = '<svg viewBox="' + (-padX) + ' 0 ' + vbw + ' ' + Math.round(vh) +
+    /* Kopfraum oben: das obere Label (Kanji + Versal-Label + bis zu 3 mehrzeilige
+     * Begriffe + Farb-Legende) wächst vom Anker NACH OBEN. Genug Luft lassen,
+     * sonst stößt der Block an die viewBox-Oberkante (Review-P1: obere Lobe spillte
+     * komplett aus dem Diagramm). vTop = wie weit der höchste Block über y=0 ragen
+     * dürfte — wir verschieben das ganze SVG um vTop nach unten. */
+    var vTop = 124;
+    var svg = '<svg viewBox="' + (-padX) + ' ' + (-vTop) + ' ' + vbw + ' ' + Math.round(vh + vTop) +
       '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dein persönliches Ikigai-Diagramm">';
 
     /* Filter: Faserkante (Tusche) + Saum-Gradienten je Kreis */
@@ -74,10 +86,13 @@
 
     svg += '<style>' +
       '.v-blob{mix-blend-mode:multiply}' +
-      '.v-label{font:600 13px Inter,sans-serif;letter-spacing:.32em;text-transform:uppercase;fill:' + P.grau + '}' +
-      '.v-kanji{font:400 26px "Shippori Mincho",serif;fill:' + P.grau + ';opacity:.55}' +
+      /* P2-B: Achsen-Label dunkle Sumi-Tinte statt hellgrau + Backing-Pill (unten) —
+       * über den gesättigten Lasur-Flächen war Ginnezumi fast unlesbar. */
+      '.v-label{font:600 13px Inter,sans-serif;letter-spacing:.28em;text-transform:uppercase;fill:' + P.sumi + '}' +
+      '.v-kanji{font:400 26px "Shippori Mincho",serif;fill:' + P.sumi + ';opacity:.5}' +
       '.v-cap{font:italic 400 11px "Shippori Mincho",serif;fill:' + P.grau + '}' +
       '.v-term{font:500 13px Inter,sans-serif;fill:' + P.sumi + '}' +
+      '.v-pill{fill:' + P.paper + ';fill-opacity:.82}' +
       '.v-satz{font:600 ' + fit.size + 'px "Shippori Mincho",Georgia,serif;fill:' + P.sumi + '}' +
       '</style>';
 
@@ -108,17 +123,30 @@
        * Engere Schranke: 1.5·r (≈ sichtbarer Kreis-Abschnitt am Anker). */
       return Math.min(2 * half, r * 1.5);
     }
-    /* Breiten-Schätzung (px) je Zeichen. Konservativ hoch angesetzt: die alten
-     * 9.2/7.2 px unterschätzten breite Glyphen (W/M/ß) + das Versalien-Tracking,
-     * sodass textLength gar nicht erst griff. Lieber leicht überschätzen → eher
-     * stauchen als überlaufen. */
+    /* Breiten-Schätzung (px) je Zeichen, konservativ HOCH (breite Glyphen W/M/ß +
+     * Versalien-Tracking). Statt horizontal zu stauchen (Review-P1: „Interdisziplinäre“
+     * lief unleserlich zusammen) → mehrzeilig umbrechen (Wort-Wrap + Hard-Break für
+     * unbrechbare Wörter) UND die Schrift bei Bedarf stufenweise verkleinern. */
     function estW(text, perChar) { return String(text).length * perChar; }
-    /* gibt das textLength/lengthAdjust-Attribut zurück, NUR wenn nötig (sonst leer,
-     * damit kurze Labels nicht künstlich gestreckt werden). */
-    function clampAttr(text, perChar, budgetW) {
-      var w = estW(text, perChar);
-      if (w <= budgetW) return "";
-      return ' textLength="' + Math.round(budgetW) + '" lengthAdjust="spacingAndGlyphs"';
+    /* zerlegt Text in Zeilen, die in budgetW passen (geschätzt). maxLines begrenzt;
+     * verkleinert perChar nicht — die Größenstaffel liegt in der Aufruf-Schicht. */
+    function fitLines(text, perChar, budgetW, maxLines) {
+      var maxChars = Math.max(3, Math.floor(budgetW / perChar));
+      return A.wrap(text, maxChars, maxLines || 3);
+    }
+    /* SVG-<text> mit gestaffelter Schriftgröße: passt der Text in 1 Zeile, große
+     * Größe; sonst kleiner + mehrzeilig. Gibt {lines, size, lh} zurück. */
+    function sizeFit(text, perCharAtBase, budgetW, baseSize, minSize, maxLines) {
+      var size = baseSize;
+      for (;;) {
+        var pc = perCharAtBase * (size / baseSize);
+        var maxChars = Math.max(3, Math.floor(budgetW / pc));
+        var lines = A.wrap(text, maxChars, maxLines);
+        if (lines.length <= maxLines || size <= minSize) {
+          return { lines: A.wrap(text, maxChars, maxLines), size: size, lh: Math.round(size * 1.18) };
+        }
+        size -= 1;
+      }
     }
 
     /* ── Lasur-Blobs (Multiply, isoliert) ── */
@@ -150,25 +178,54 @@
       'style="font:600 8px Inter,sans-serif;fill:' + P.grau + ';letter-spacing:.3em">IKIGAI</text>';
     svg += '</g>';
 
-    /* ── Labels außen + Kanji-Marker + Begriffe ── */
+    /* ── Labels außen + Kanji-Marker + Begriffe ──
+     * Layout pro Kreis: Kanji · Versal-Label (mit Backing-Pill für Kontrast) ·
+     * bis zu 3 Begriffe (jeder mehrzeilig umbrochen + größen-gestaffelt) · Farb-Legende.
+     * Top-Kreis: Block wächst NACH OBEN (sonst läuft er in die Kreise). Bottom: nach
+     * unten. Seiten: vertikal um den Anker zentriert. KEIN horizontales Stauchen mehr. */
     GEO.circles.forEach(function (ci) {
       var a = anchor(ci);
       var bud = budget(ci, a.x);
       var terms = (data.kreise && data.kreise[ci.key]) || [];
+      /* Versal-Label umbrechen/staffeln (12 px/Char @13 px inkl. Tracking) */
+      var labFit = sizeFit(ci.label.toUpperCase(), 11.5, bud, 13, 10, 2);
+      /* Begriffe einzeln umbrechen/staffeln (7.6 px/Char @13 px) */
+      var termBlocks = terms.slice(0, 3).map(function (t) { return sizeFit(t, 7.8, bud, 13, 10, 2); });
+      var cap = A.FARBNAMEN[ci.key];
+
+      /* Block-Höhen berechnen (für Top-nach-oben-Layout) */
+      var KANJI_H = 26, GAP = 6, LAB_GAP = 7, TERM_GAP = 5, CAP_H = 14;
+      var labH = labFit.lines.length * labFit.lh;
+      var termsH = 0;
+      termBlocks.forEach(function (b) { termsH += b.lines.length * b.lh + TERM_GAP; });
+      var contentH = labH + LAB_GAP + termsH + CAP_H;        // Label + Begriffe + Legende
+      var top;                                                // y der Label-Oberkante (1. Label-Baseline ohne Kanji)
+      if (ci.dy < 0) top = a.y - contentH;                    // oben: ganzer Block über dem Anker
+      else if (ci.dy > 0) top = a.y - 4;                      // unten: knapp unter dem Anker
+      else top = a.y - contentH / 2 + 6;                      // Seiten: vertikal zentriert
+
       svg += '<g class="venn-t" text-anchor="middle">';
-      svg += '<text class="v-kanji" x="' + a.x + '" y="' + (a.y - 30) + '">' + A.KANJI[ci.key] + '</text>';
-      /* Versalien-Label (mit Tracking) — bei Überlänge auf das Budget stauchen.
-       * per-Char konservativ HOCH: Versal-Inter 13px ≈ 8px Glyph + .32em (≈4.2px)
-       * Tracking → ~12px/Char; Begriffe (gemischt, kein Tracking) ~7.6px; Kursiv-
-       * Mincho-Cap ~6.2px. Lieber knapp überschätzen → eher stauchen als überlaufen. */
-      svg += '<text class="v-label" x="' + a.x + '" y="' + (a.y - 8) + '"' +
-        clampAttr(ci.label, 12, bud) + '>' + esc(ci.label) + '</text>';
-      terms.slice(0, 3).forEach(function (t, k) {
-        svg += '<text class="v-term" x="' + a.x + '" y="' + (a.y + 12 + k * 17) + '"' +
-          clampAttr(t, 7.6, bud) + '>' + esc(t) + '</text>';
+      /* Kanji über dem Block */
+      svg += '<text class="v-kanji" x="' + a.x + '" y="' + (top - GAP) + '">' + A.KANJI[ci.key] + '</text>';
+      /* Backing-Pill hinter dem Versal-Label (Kontrast über Lasur-Fläche, P2-B) */
+      var pillW = bud + 12, pillH = labH + 8;
+      svg += '<rect class="v-pill" x="' + (a.x - pillW / 2) + '" y="' + (top - labFit.size + 1) +
+        '" width="' + pillW + '" height="' + pillH + '" rx="5"/>';
+      var ly = top;
+      labFit.lines.forEach(function (ln, i) {
+        svg += '<text class="v-label" x="' + a.x + '" y="' + ly + '" style="font-size:' + labFit.size + 'px">' + esc(ln) + '</text>';
+        ly += labFit.lh;
       });
-      svg += '<text class="v-cap" x="' + a.x + '" y="' + (a.y + 12 + Math.min(terms.length, 3) * 17 + 4) + '"' +
-        clampAttr(A.FARBNAMEN[ci.key], 6.2, bud) + '>' + esc(A.FARBNAMEN[ci.key]) + '</text>';
+      ly += LAB_GAP - labFit.lh + (labFit.lh - labFit.size) /* visuelle Korrektur */;
+      ly = top + labH + LAB_GAP;
+      termBlocks.forEach(function (b) {
+        b.lines.forEach(function (ln) {
+          svg += '<text class="v-term" x="' + a.x + '" y="' + ly + '" style="font-size:' + b.size + 'px">' + esc(ln) + '</text>';
+          ly += b.lh;
+        });
+        ly += TERM_GAP;
+      });
+      svg += '<text class="v-cap" x="' + a.x + '" y="' + (ly + 4) + '">' + esc(cap) + '</text>';
       svg += '</g>';
     });
 
