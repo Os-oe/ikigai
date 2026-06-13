@@ -8,8 +8,13 @@
   var LS_KEY = "ikigai-state-v1";
   var params = new URLSearchParams(location.search);
   var FAST = params.get("fast") === "1";
-  var DEMO = params.get("demo") === "1";
-  var MOCK = params.get("mock") === "1";
+  var DEMO_KIND = params.get("demo");                 // "1" = Lena · "long" = Stress-Variante
+  var DEMO = DEMO_KIND === "1" || DEMO_KIND === "long";
+  var LONG = DEMO_KIND === "long";
+  /* Long-Demo immer ohne API-Call (deterministisches Stress-Fixture) */
+  var MOCK = params.get("mock") === "1" || LONG;
+  /* aktive Persona für Demo/Mock/Fallback (Long-Variante überschreibt Lena) */
+  function PERSONA() { return LONG ? window.LENA_LONG : window.LENA; }
   if (FAST) document.documentElement.classList.add("fast");
 
   /* ---------- Schritt-Liste bauen ---------- */
@@ -460,8 +465,8 @@
         window.__ikig.lastResult = ergebnis;
         var ctx = {
           beispiel: istBeispiel,
-          profil: istBeispiel ? window.LENA.profil : state.profil,
-          ikigai9: istBeispiel ? window.LENA.ikigai9 : state.ikigai9,
+          profil: istBeispiel ? PERSONA().profil : state.profil,
+          ikigai9: istBeispiel ? PERSONA().ikigai9 : state.ikigai9,
           fast: FAST,
           reveal: true /* Typewriter-Reveal + Scroll-Lock beim ersten Anzeigen */
         };
@@ -471,7 +476,7 @@
       }, rest);
     }
 
-    if (MOCK) { finish(window.LENA.ergebnis, false); return; }
+    if (MOCK) { finish(PERSONA().ergebnis, false); return; }
 
     fetch("/api/synthesize", {
       method: "POST",
@@ -487,17 +492,17 @@
           if (card) err(card, r.j.error_user);
           return;
         }
-        finish(window.LENA.ergebnis, true); /* Cap/Server-Fehler → Beispiel-Ergebnis */
+        finish(PERSONA().ergebnis, true); /* Cap/Server-Fehler → Beispiel-Ergebnis */
       })
-      .catch(function () { finish(window.LENA.ergebnis, true); });
+      .catch(function () { finish(PERSONA().ergebnis, true); });
   }
 
   /* ---------- Demo-Vorbefüllung ---------- */
   function prefillLena() {
     state = freshState();
-    state.profil = JSON.parse(JSON.stringify(window.LENA.profil));
-    state.ikigai9 = window.LENA.ikigai9.slice();
-    state.antworten = JSON.parse(JSON.stringify(window.LENA.antworten));
+    state.profil = JSON.parse(JSON.stringify(PERSONA().profil));
+    state.ikigai9 = PERSONA().ikigai9.slice();
+    state.antworten = JSON.parse(JSON.stringify(PERSONA().antworten));
     state.step = steps.length - 1;
     state.started = true;
   }

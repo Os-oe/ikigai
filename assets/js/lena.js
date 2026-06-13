@@ -122,3 +122,41 @@ window.LENA = {
     score_kommentar: "30 von 45 Punkten — eine solide Basis. Auffällig: Dein stärkster Wert liegt bei „Ich möchte etwas Neues lernen oder anfangen“ (5/5), dein schwächster bei innerer Gelassenheit (2/5). Übersetzt: Die Energie ist da, ihr fehlt nur ein geschützter Raum."
   }
 };
+
+/* ?demo=long — Stress-Variante mit LANGEN, mehrwortigen und teils unbrechbar
+ * langen Begriffen. Genau diese Texte deckten die Mängel auf, die die kurze
+ * Lena-Demo verdeckte (Venn-Overflow, Karussell-Stauchung, PDF-Header-Kollision).
+ * Standard-Long-Text-Gate für alle visuellen Artefakte. Schema identisch zu LENA. */
+window.LENA_LONG = (function () {
+  var L = JSON.parse(JSON.stringify(window.LENA.ergebnis));
+  var TERM = "Interdisziplinäre Systemarchitektur";              // ein langes, schwer brechbares Wort + Phrase
+  L.zentrum = "Du verbindest interdisziplinäre Systemarchitektur mit einem außergewöhnlich feinen Gespür für die Menschen, die mit diesen Systemen arbeiten, und schaffst dadurch Orientierung in Übergangsphasen.";
+  L.kreise = {
+    liebe:   ["Interdisziplinäre Systemarchitektur", "Menschen in Übergangsphasen begleiten", "Komplexität verständlich erklären"],
+    staerke: ["Langfristige strategische Planung", "Empathisches Mentoring von Teams", "Interdisziplinäre Systemarchitektur"],
+    welt:    ["Organisationen in Transformationsprozessen", "Menschen Orientierung und Halt geben", "Nachhaltige Wertschöpfungsketten"],
+    markt:   ["Strategische Organisationsberatung", "Interdisziplinäre Systemarchitektur", "Transformationsbegleitung für Führungskräfte"]
+  };
+  L.schnittmengen = {
+    passion: "interdisziplinäre Systemgeschichten strukturieren",
+    mission: "Menschen in Übergangsphasen Orientierung geben",
+    beruf: "Transformationsprozesse strategisch begleiten",
+    berufung: "Organisationen ganzheitlich entwirren"
+  };
+  L.erkenntnisse[0].zitat = "Menschen in Übergangsphasen begleiten und ihnen Orientierung geben";
+  L.alltag[0].moment = "der erste interdisziplinäre Systemarchitektur-Gedanke am Samstagmorgen, bevor alle wach sind";
+  L.ideen[0].erster_schritt = "Skizziere die interdisziplinäre Systemarchitektur deines nächsten Transformationsprozesses auf einer einzigen Seite.";
+  L.carousel = {
+    stichworte: {
+      liebe: "Interdisziplinäre Systemarchitektur",
+      staerke: "Langfristige strategische Planung",
+      welt: "Menschen in Übergangsphasen begleiten",
+      markt: "Strategische Organisationsberatung"
+    },
+    erkenntnis: "Du wirst längst dafür bezahlt, interdisziplinäre Systemarchitektur in echte Orientierung zu übersetzen — nicht nur in Diagramme.",
+    freuden: ["Interdisziplinäre Systemarchitektur", "Zehn Minuten auf dem Balkon", "Der kleine Fotoblog"],
+    schritt: "Skizziere die interdisziplinäre Systemarchitektur deines nächsten Transformationsprozesses."
+  };
+  return { profil: { name: "Konstantin", beruf: "Interdisziplinärer Transformationsbegleiter" },
+           ikigai9: window.LENA.ikigai9.slice(), antworten: window.LENA.antworten, ergebnis: L, _term: TERM };
+})();

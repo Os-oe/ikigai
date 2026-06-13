@@ -152,19 +152,75 @@
     return s.toUpperCase().slice(0, 2);
   }
 
-  /* Zeilen-Umbruch (geteilt mit altem GEO.wrap) */
+  /* Zeilen-Umbruch (geteilt mit altem GEO.wrap). Bricht zusätzlich EINZELNE
+   * unbrechbar lange Wörter hart auf (sonst läuft „Interdisziplinäre“ über jede
+   * Grenze — das war die Wurzel der Venn-/Karussell-Overflows). */
   function wrap(text, maxChars, maxLines) {
-    var words = String(text).split(/\s+/), lines = [], cur = "";
+    var raw = String(text).split(/\s+/), words = [];
+    raw.forEach(function (w) {
+      while (w.length > maxChars) { words.push(w.slice(0, Math.max(1, maxChars - 1)) + "­"); w = w.slice(Math.max(1, maxChars - 1)); }
+      words.push(w);
+    });
+    var lines = [], cur = "";
     words.forEach(function (w) {
-      if ((cur + " " + w).trim().length > maxChars && cur) { lines.push(cur); cur = w; }
-      else cur = (cur + " " + w).trim();
+      var glue = (cur && cur.charAt(cur.length - 1) === "­") ? "" : " ";
+      if ((cur + glue + w).trim().length > maxChars && cur) { lines.push(cur); cur = w; }
+      else cur = (cur + glue + w).replace(/^\s+/, "");
     });
     if (cur) lines.push(cur);
     if (maxLines && lines.length > maxLines) {
       lines = lines.slice(0, maxLines);
-      lines[maxLines - 1] = lines[maxLines - 1].replace(/.{1}$/, "") + "…";
+      lines[maxLines - 1] = lines[maxLines - 1].replace(/[\s­]*.$/, "") + "…";
     }
-    return lines;
+    /* sichtbares Soft-Hyphen am Zeilenende → echter Bindestrich */
+    return lines.map(function (l) { return l.replace(/­$/, "-").replace(/­/g, ""); });
+  }
+
+  /* Canvas-Wortumbruch mit echter Breitenmessung + Hard-Break unbrechbarer Wörter.
+   * Gibt {lines, font} zurück: schrumpft die Schrift stufenweise, bis ALLE Zeilen
+   * in maxW passen UND die Zeilenzahl <= maxLines bleibt. NIE horizontal stauchen. */
+  function fitWrap(ctx, text, maxW, maxLines, makeFont, basePx, minPx) {
+    minPx = minPx || Math.max(9, Math.round(basePx * 0.55));
+    var size = basePx, lines;
+    for (;;) {
+      ctx.font = makeFont(size);
+      lines = wrapMeasured(ctx, text, maxW);
+      var widest = 0;
+      lines.forEach(function (l) { widest = Math.max(widest, ctx.measureText(l).width); });
+      if ((lines.length <= maxLines && widest <= maxW + 0.5) || size <= minPx) break;
+      size -= 1;
+    }
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines);
+      var last = lines[maxLines - 1];
+      while (last && ctx.measureText(last + "…").width > maxW) last = last.replace(/[\s-]*\S$/, "").replace(/-$/, "");
+      lines[maxLines - 1] = (last || lines[maxLines - 1]) + "…";
+    }
+    return { lines: lines, size: size };
+  }
+
+  /* Wortumbruch per gemessener Breite; lange Einzelwörter werden zeichenweise hart
+   * gebrochen, damit keine Zeile maxW überschreitet. */
+  function wrapMeasured(ctx, text, maxW) {
+    var words = String(text).split(/\s+/), lines = [], line = "";
+    function pushBroken(w) {
+      var chunk = "";
+      for (var i = 0; i < w.length; i++) {
+        var t = chunk + w[i];
+        if (ctx.measureText(t + "-").width > maxW && chunk) { lines.push(chunk + "-"); chunk = w[i]; }
+        else chunk = t;
+      }
+      return chunk;
+    }
+    words.forEach(function (w) {
+      var test = (line ? line + " " : "") + w;
+      if (ctx.measureText(test).width <= maxW) { line = test; return; }
+      if (line) { lines.push(line); line = ""; }
+      if (ctx.measureText(w).width > maxW) { line = pushBroken(w); }
+      else line = w;
+    });
+    if (line) lines.push(line);
+    return lines.length ? lines : [""];
   }
 
   window.IKIGAI_ART = {
@@ -172,6 +228,7 @@
     rng: rng, hashStr: hashStr, seedFromData: seedFromData,
     blobPath: blobPath, catmullRom: catmullRom, misreg: misreg,
     ensoFillPath: ensoFillPath, initials: initials, wrap: wrap,
+    fitWrap: fitWrap, wrapMeasured: wrapMeasured,
     hexA: function (hex, a) {
       var n = parseInt(hex.slice(1), 16);
       return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
