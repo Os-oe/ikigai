@@ -175,8 +175,14 @@
     var d = this.doc;
     d.setFont("helvetica", "normal"); d.setFontSize(6.5);
     d.setTextColor(FAINT[0], FAINT[1], FAINT[2]);
-    d.text("ikigAI · Persönlicher Report · 2026", PW - 8, PH / 2, { angle: 90, align: "center", charSpace: 0.4 });
+    /* ganz nach außen in den Margin (x = PW-4): die rotierte Marginalie kollidierte
+     * sonst mit dem rechten Rand langer Fließtext-/Zitat-Zeilen (Review-P2-A,
+     * S2/S8/S10). Der Body-Satzspiegel endet jetzt garantiert links davon. */
+    d.text("ikigAI · Persönlicher Report · 2026", PW - 4, PH / 2, { angle: 90, align: "center", charSpace: 0.4 });
   };
+  /* rechte Grenze des Body-Satzspiegels: lässt einen sicheren Gutter zur Hashira-
+   * Marginalie. Alle width-basierten Helfer clampen hierauf. */
+  var BODY_RIGHT = PW - 16;   /* = 194 mm — Hashira-Glyphe sitzt bei ~199-203 */
   Doc.prototype.monSignet = function () {
     /* kleines rundes Wappen aus den 4 Dimensions-Scores (4 Bogen, Dicke = Score) */
     var d = this.doc, cx = MX, cy = PH - MBOT + 6, r = 4.2;
@@ -247,11 +253,14 @@
     d.setFontSize(size);
     var col = opts.color || SOFT;
     d.setTextColor(col[0], col[1], col[2]);
+    var x = opts.x || MX;
     var w = opts.width || 100; /* schmale Satzbreite ~55-65 Zeichen */
+    /* harte Clamp auf den Body-Satzspiegel: kein Überlauf in die Hashira (P2-A) */
+    if (x + w > BODY_RIGHT) w = BODY_RIGHT - x;
     var lines = d.splitTextToSize(t, w);
     var lh = size * 0.5 * (opts.lh || 1.0);
     this.need(lines.length * lh + (opts.after == null ? 4 : opts.after));
-    d.text(lines, opts.x || MX, this.y);
+    d.text(lines, x, this.y);
     this.y += lines.length * lh + (opts.after == null ? 4 : opts.after);
     return lines.length * lh;
   };
