@@ -37,14 +37,16 @@
     };
     /* Erkenntnis als Beobachtung (kein Defizit) */
     var erk = c.erkenntnis || ((erg.erkenntnisse || [])[0] || {}).text || "";
-    /* 3 Freuden aus Alltag (nahbar, risikolos) — auf ~7 Wörter verdichtet, ein
-     * Halbsatz reicht; lange Sätze würden auf der Slide hart abgeschnitten. */
+    /* 3 Freuden aus Alltag (nahbar, risikolos) — auf einen kuratierten Halbsatz
+     * verdichtet. WICHTIG: den Artikel NICHT abschneiden — „der erste Kaffee“ ohne
+     * „der“ liest als kaputt, nicht als kuratiert. Nur an erster Sinngrenze
+     * (Komma/Gedankenstrich) kürzen, auf max. 7 Wörter, ersten Buchstaben groß. */
     var freuden = c.freuden || (erg.alltag || []).slice(0, 3).map(function (a) {
-      var t = String(a.moment || "").replace(/^(der|die|das|mein|meine|ein|eine)\s+/i, "");
-      /* an erster Sinngrenze (Komma/Gedankenstrich) kürzen, dann auf 7 Wörter */
-      t = t.split(/\s*[—–,]\s+/)[0];
+      var t = String(a.moment || "").trim();
+      t = t.split(/\s*[—–,]\s+/)[0].trim();
       var w = t.split(/\s+/);
       if (w.length > 7) t = w.slice(0, 7).join(" ");
+      if (t) t = t.charAt(0).toUpperCase() + t.slice(1);
       return t;
     });
     var schritt = c.schritt || (((erg.ideen || [])[0] || {}).erster_schritt) || "";
@@ -240,17 +242,28 @@
       ctx.fillText("Kleine Freuden", W / 2, 280);
       ctx.fillStyle = P.grau; ctx.font = "italic 400 28px " + SERIF;
       ctx.fillText("die dich schon heute tragen", W / 2, 330);
-      var y = 520, tickX = W * 0.17, textX = W * 0.24, maxW = W - textX - 120;
+      /* Tick links, Text rechts — mit garantiertem Abstand dazwischen, damit der
+       * Pinsel-Tick NIE über/in den Text läuft. Tick-Ende + Gap < Text-Anfang. */
+      var FONT5 = "500 38px " + SANS, LH5 = 48;
+      var tickX = W * 0.16, tickLen = W * 0.07;   // Tick-Band: 0.16W .. 0.23W
+      var textX = W * 0.27;                         // Text startet sicher rechts vom Tick
+      var maxW = W - textX - 110;                   // rechter Sicherheits-Rand
+      var y = 500;
       d.freuden.forEach(function (f) {
-        /* roter Pinsel-Tick statt Bullet */
+        /* sauberer Umbruch auf max. 2 Zeilen statt hartem „…“-Abschnitt */
+        var lines = wrapLines(ctx, String(f), maxW, FONT5, 2);
+        /* roter Pinsel-Tick: auf der optischen Mitte der ERSTEN Textzeile (≈ y - 12),
+         * waagerecht links neben dem Text, kein Überlappen mehr. */
+        var tickY = y - 12;
         ctx.save();
         ctx.strokeStyle = A.hexA(P.accent, 0.85); ctx.lineWidth = 8; ctx.lineCap = "round";
-        ctx.beginPath(); ctx.moveTo(tickX, y - 12); ctx.quadraticCurveTo(tickX + W * 0.04, y - 24, tickX + W * 0.08, y - 14);
+        ctx.beginPath();
+        ctx.moveTo(tickX, tickY + 2);
+        ctx.quadraticCurveTo(tickX + tickLen * 0.5, tickY - 7, tickX + tickLen, tickY);
         ctx.stroke(); ctx.restore();
-        /* sauberer Umbruch auf max. 2 Zeilen statt hartem „…“-Abschnitt */
-        var lines = wrapLines(ctx, String(f), maxW, "500 38px " + SANS, 2);
-        ctx.textAlign = "left"; ctx.fillStyle = P.sumi; ctx.font = "500 38px " + SANS;
-        lines.forEach(function (ln, li) { ctx.fillText(ln, textX, y + li * 48); });
+        /* Text */
+        ctx.textAlign = "left"; ctx.fillStyle = P.sumi; ctx.font = FONT5;
+        lines.forEach(function (ln, li) { ctx.fillText(ln, textX, y + li * LH5); });
         y += (lines.length === 2 ? 200 : 150);
       });
       progress(ctx, 5, false);
