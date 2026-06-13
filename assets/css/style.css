@@ -515,3 +515,30 @@ html.fast .reveal { opacity: 1; transform: none; }
   .wizard-nav .btn { padding: .75rem 1.6rem; }
   .screen-hero { padding: 2.2rem 1.2rem; }
 }
+
+/* ───────── Desktop-Komposition (Review-P2-C) ─────────
+ * Auf breiten Screens (≥720px) wirkte der Wizard „leer/unfertig": die schmale
+ * 660px-Spalte mit min-height:100dvh + vertikal zentrierter Stage ließ riesige
+ * leere Flächen über und unter dem Frage-Block. Fix: die ganze Sektion wird zur
+ * vertikal+horizontal zentrierenden Bühne, der eigentliche Inhalt sitzt in einer
+ * gebündelten, gerahmten Spalte (Washi-Panel) — komponiert statt schwebend.
+ * Mobile (<720px) bleibt unverändert. */
+@media (min-width: 720px) {
+  .screen-wizard {
+    /* Sektion zentriert ihren Inhalt; Stage stretcht nicht mehr auf Vollhöhe */
+    justify-content: center;
+    max-width: 600px;
+    padding: 2.6rem 2.8rem 2.2rem;
+    margin: 5vh auto;                 /* Atemraum oben/unten statt Vollviewport */
+    min-height: auto;
+    /* dezentes Washi-Panel, damit die Spalte als Komposition liest */
+    background: linear-gradient(180deg, rgba(255,253,248,.55), rgba(245,240,230,.35));
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 24px 60px -38px rgba(39,34,31,.35);
+  }
+  /* Stage hugt ihren Inhalt (kein flex:1-Stretch, keine vertikale Zentrierung
+   * innerhalb einer übergroßen Box) → Frage-Block + Nav bleiben gruppiert. */
+  .wizard-stage { flex: 0 0 auto; justify-content: flex-start; min-height: auto; padding-top: .4rem; }
+  .wizard-nav { margin-top: 1.8rem; }
+}
