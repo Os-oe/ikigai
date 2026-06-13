@@ -320,8 +320,8 @@
     }
   });
 
-  /* ---------- Synthese ---------- */
-  var waitTimer = null;
+  /* ---------- Synthese-Warte-Dramaturgie (inszenierter Höhepunkt) ---------- */
+  var waitTimer = null, stageTimers = [];
   function startWaitFacts() {
     var i = 0, el = $("#wait-fact");
     el.textContent = F.warteFakten[0];
@@ -331,34 +331,88 @@
       setTimeout(function () { el.textContent = F.warteFakten[i]; el.style.opacity = 1; }, FAST ? 10 : 450);
     }, FAST ? 300 : 4200);
   }
-  function stopWaitFacts() { if (waitTimer) clearInterval(waitTimer); waitTimer = null; }
+  function stopWaitFacts() {
+    if (waitTimer) clearInterval(waitTimer); waitTimer = null;
+    stageTimers.forEach(clearTimeout); stageTimers = [];
+  }
+
+  /* echte User-Worte für die Wartesequenz ziehen (nie generische Fake-Steps) */
+  function realWords() {
+    var pool = [];
+    ["a1", "a3", "b1", "b2", "c1", "c2", "d2", "e1", "e3"].forEach(function (k) {
+      var v = state.antworten[k];
+      if (typeof v === "string" && v.trim().length > 6) {
+        var w = v.trim().split(/\s+/).filter(function (x) { return x.length > 4; });
+        if (w.length) pool.push(w.sort(function (a, b) { return b.length - a.length; })[0].replace(/[^\wäöüÄÖÜß-]/g, ""));
+      }
+    });
+    (state.antworten.a2 || []).concat(state.antworten.b3 || []).forEach(function (c) {
+      var t = String(c).replace(/[„“"]/g, "").trim();
+      if (t) pool.push(t.split(/\s+/)[0]);
+    });
+    return pool.filter(Boolean);
+  }
+  function realFragments() {
+    var frags = [];
+    ["a1", "b1", "c1", "e1", "e3"].forEach(function (k) {
+      var v = state.antworten[k];
+      if (typeof v === "string" && v.trim().length > 10) frags.push("„" + v.trim().slice(0, 70) + (v.length > 70 ? "…" : "") + "“");
+    });
+    return frags;
+  }
+
+  /* getimete Status-Sequenz — läuft unabhängig vom echten API-Call */
+  function runWaitStory() {
+    var title = $(".wait-title"), fragEl = $("#wait-fragment");
+    var words = realWords(), frags = realFragments();
+    var nAnsw = answeredCount();
+    function w(i) { return words.length ? words[i % words.length] : "deinen Worten"; }
+    var steps = [
+      { t: "Lese deine " + nAnsw + " Antworten …", frag: frags[0] },
+      { t: "Suche das Muster zwischen „" + w(0) + "“ und „" + w(1) + "“ …", frag: frags[1] },
+      { t: "Lege „" + w(2) + "“ neben „" + w(3) + "“ …", frag: frags[2] },
+      { t: "Verdichte deinen Satz …", frag: null }
+    ];
+    var delays = FAST ? [0, 60, 120, 180] : [200, 3200, 6400, 9200]; // Beschleunigung gegen Ende
+    steps.forEach(function (s, i) {
+      stageTimers.push(setTimeout(function () {
+        title.textContent = s.t;
+        if (s.frag && fragEl) {
+          fragEl.textContent = s.frag;
+          fragEl.classList.remove("fly"); void fragEl.offsetWidth; fragEl.classList.add("fly");
+        }
+      }, delays[i]));
+    });
+  }
 
   function payload() {
     return { profil: state.profil, ikigai9: state.ikigai9, antworten: state.antworten };
   }
 
   function startSynthese() {
-    show(elWait); startWaitFacts();
+    document.body.classList.add("wait-mode");
+    show(elWait); startWaitFacts(); runWaitStory();
     var t0 = Date.now();
-    var minWait = FAST ? 0 : 2600;
+    var minWait = FAST ? 0 : 9800; /* die ganze Sequenz darf laufen */
     var waitTitle = $(".wait-title");
-    waitTitle.textContent = "Deine Antworten werden verdichtet …";
     var longTimer = setTimeout(function () {
       waitTitle.textContent = "Dauert gerade etwas länger — die KI liest deine Antworten gründlich.";
-    }, 18000);
+    }, 19000);
 
     function finish(ergebnis, istBeispiel) {
       var rest = Math.max(0, minWait - (Date.now() - t0));
       clearTimeout(longTimer);
       setTimeout(function () {
         stopWaitFacts();
+        document.body.classList.remove("wait-mode");
         state.done = true; save();
         window.__ikig.lastResult = ergebnis;
         var ctx = {
           beispiel: istBeispiel,
           profil: istBeispiel ? window.LENA.profil : state.profil,
           ikigai9: istBeispiel ? window.LENA.ikigai9 : state.ikigai9,
-          fast: FAST
+          fast: FAST,
+          reveal: true /* Typewriter-Reveal + Scroll-Lock beim ersten Anzeigen */
         };
         if (!istBeispiel && !MOCK) saveResult(ergebnis, ctx);
         window.IKIGAI_RESULT.render(ergebnis, ctx);
@@ -376,8 +430,8 @@
       .then(function (r) {
         if (r.j && r.j.ok && r.j.ergebnis) { finish(r.j.ergebnis, false); return; }
         if (r.j && r.j.error_user) {
-          /* strukturierter Inhalts-Fehler: zurück in den Wizard, sanfter Hinweis */
-          clearTimeout(longTimer); stopWaitFacts(); show(elWiz);
+          clearTimeout(longTimer); stopWaitFacts();
+          document.body.classList.remove("wait-mode"); show(elWiz);
           var card = stage.firstChild;
           if (card) err(card, r.j.error_user);
           return;

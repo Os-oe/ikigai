@@ -86,6 +86,7 @@
     }
 
     /* ── Labels außen + Kanji + Begriffe ── */
+    if (opts.noLabels || ghost) return;
     ctx.textAlign = "center";
     GEO.circles.forEach(function (ci) {
       var cx = cx0 + ci.dx * off, cy = cy0 + ci.dy * off;

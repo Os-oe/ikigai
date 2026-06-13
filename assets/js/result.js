@@ -21,6 +21,57 @@
       (h2 ? '<h2 class="r-h2">' + h2 + "</h2>" : "") + inner + "</section>";
   }
 
+  /* 30-Tage-Wiedermessung als Kalender-Datei (kein Backend, kein Mail) */
+  function downloadIcs(ctx) {
+    var d = new Date(); d.setDate(d.getDate() + 30);
+    var ymd = d.toISOString().slice(0, 10).replace(/-/g, "");
+    var name = (ctx.profil && ctx.profil.name || "").trim();
+    var uid = "ikigai-" + Date.now() + "@osai.solutions";
+    var ics = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//OsAI//ikigAI//DE", "CALSCALE:GREGORIAN",
+      "BEGIN:VEVENT", "UID:" + uid, "DTSTART;VALUE=DATE:" + ymd, "DTEND;VALUE=DATE:" + ymd,
+      "SUMMARY:Ikigai-Wiedermessung" + (name ? " — " + name : ""),
+      "DESCRIPTION:Miss dich heute noch einmal auf ikigai.demo.osai.solutions und vergleiche deinen Ikigai-9-Wert. Der Wert ist ein Foto\\, kein Urteil.",
+      "URL:https://ikigai.demo.osai.solutions/", "END:VEVENT", "END:VCALENDAR"
+    ].join("\r\n");
+    var blob = new Blob([ics], { type: "text/calendar" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "ikigai-wiedermessung.ics";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+
+  /* Typewriter-Reveal-Overlay: Satz Zeichen für Zeichen, Scroll-Lock bis fertig. */
+  function revealSatz(satz) {
+    satz = String(satz || "");
+    if (!satz) return;
+    document.body.classList.add("reveal-lock");
+    var ov = document.createElement("div");
+    ov.className = "reveal-overlay";
+    ov.innerHTML = '<p class="reveal-kicker">Dein Ikigai in einem Satz</p>' +
+      '<p class="reveal-satz" id="reveal-satz"></p>' +
+      '<span class="reveal-caret">|</span>';
+    document.body.appendChild(ov);
+    var target = ov.querySelector("#reveal-satz");
+    var caret = ov.querySelector(".reveal-caret");
+    var i = 0, full = "„" + satz + "“";
+    var iv = setInterval(function () {
+      i++;
+      target.textContent = full.slice(0, i);
+      if (i >= full.length) {
+        clearInterval(iv);
+        setTimeout(function () {
+          caret.style.opacity = "0";
+          ov.classList.add("done");
+          setTimeout(function () {
+            ov.remove();
+            document.body.classList.remove("reveal-lock");
+          }, 900);
+        }, 1100);
+      }
+    }, 42); /* konstante, lesbare Geschwindigkeit — nicht Token-Speed */
+  }
+
   window.IKIGAI_RESULT = {
     current: null,
 
@@ -40,32 +91,36 @@
       html += section("Dein Ergebnis", anrede + " ist dein Ikigai — auf beiden Ebenen.",
         '<div class="venn-wrap" id="venn-wrap">' + window.IKIGAI_VENN(erg, { name: name }) + "</div>");
 
-      /* 2 · Alltags-Ebene */
+      /* 2 · Alltags-Ebene — Karten mit Säulen-Marker (eigenes Vokabular) */
+      var SAEULE_KANJI = ["小", "放", "和", "楽", "今"];
       var alltagHtml = '<div class="alltag-grid">';
       (erg.alltag || []).forEach(function (a) {
         var s = F.saeulen[(a.saeule || 1) - 1] || F.saeulen[0];
         alltagHtml += '<div class="alltag-card">' +
+          '<span class="alltag-kanji" lang="ja" aria-hidden="true">' + SAEULE_KANJI[(a.saeule || 1) - 1] + '</span>' +
           '<p class="saeule">Säule ' + s.nr + " · " + esc(s.name) + "</p>" +
           '<p class="moment">„' + esc(a.moment) + '“</p>' +
           "<p>" + esc(a.kommentar) + "</p></div>";
       });
       alltagHtml += "</div>";
       html += section("Ebene 2 · Die japanische Alltags-Ebene", "Dein Ikigai im Kleinen",
-        '<p class="r-intro">In Japan ist Ikigai kein Karriereziel, sondern das, was den Tag trägt. Das hier hast du schon — sortiert nach Ken Mogis fünf Säulen:</p>' + alltagHtml);
+        '<p class="r-intro">In Japan ist Ikigai kein Karriereziel, sondern das, was den Tag trägt. Das hier hast du schon — sortiert nach Ken Mogis fünf Säulen:</p>' + alltagHtml,
+        "r-section--cool");
 
-      /* 3 · Erkenntnisse */
+      /* 3 · Erkenntnisse — Zitat-Karten (roter Strich) */
       var erkHtml = "";
       (erg.erkenntnisse || []).forEach(function (e) {
-        erkHtml += '<div class="r-card"><h3>' + esc(e.titel) + "</h3>" +
+        erkHtml += '<div class="r-card card-erkenntnis"><h3>' + esc(e.titel) + "</h3>" +
           '<p class="r-zitat">Du hast geschrieben: „' + esc(e.zitat) + '“</p>' +
           "<p>" + esc(e.text) + "</p></div>";
       });
       html += section("Muster in deinen Antworten", "Drei Dinge, die auffallen", erkHtml);
 
-      /* 4 · Ideen */
+      /* 4 · Ideen — Ideen-Karten (Typ-Tag, nummeriert) */
       var ideenHtml = "";
-      (erg.ideen || []).forEach(function (i) {
-        ideenHtml += '<div class="r-card"><span class="typ-tag">' + esc(i.typ) + "</span>" +
+      (erg.ideen || []).forEach(function (i, idx) {
+        ideenHtml += '<div class="r-card card-idee"><span class="idee-no">' + (idx + 1) + '</span>' +
+          '<span class="typ-tag">' + esc(i.typ) + "</span>" +
           "<h3>" + esc(i.titel) + "</h3>" +
           "<p>" + esc(i.begruendung) + "</p>" +
           '<p class="erster-schritt"><strong>Erster Schritt:</strong> ' + esc(i.erster_schritt) + "</p></div>";
@@ -94,16 +149,28 @@
         GESCHICHTE.map(function (p) { return "<p>" + p + "</p>"; }).join("") +
         "</div></section>";
 
-      /* 8 · Downloads */
-      html += section("Mitnehmen", "Dein Report & dein Share-Bild",
-        '<p class="r-intro">Sofort und ohne E-Mail-Adresse — versprochen ist versprochen.</p>' +
-        '<div class="dl-row">' +
-        '<button id="btn-pdf" class="btn btn-accent">PDF-Report herunterladen</button>' +
-        '<button id="btn-share-sq" class="btn">Share-Bild 1:1</button>' +
-        '<button id="btn-share-story" class="btn">Story-Format 9:16</button>' +
-        "</div>" +
-        '<div class="share-preview"><canvas id="share-sq" class="sq" width="1080" height="1080"></canvas>' +
-        '<canvas id="share-story" class="story" width="1080" height="1920"></canvas></div>');
+      /* 8 · Downloads — zwei Artefakte, zwei Tiefen */
+      html += section("Mitnehmen", "Dein Report & dein Karussell",
+        '<p class="r-intro"><strong>Dein Report ist privat.</strong> Diese Slides sind zum Teilen gemacht — ' +
+        'sofort und ohne E-Mail-Adresse, versprochen ist versprochen.</p>' +
+        '<div class="dl-block">' +
+          '<div class="dl-head"><span class="dl-kanji" lang="ja" aria-hidden="true">秘</span>' +
+          '<div><p class="dl-title">Privat · für dich</p><p class="dl-sub">Das ehrliche 8-seitige Workbook mit 30-Tage-Plan.</p></div></div>' +
+          '<div class="dl-row">' +
+          '<button id="btn-pdf" class="btn btn-accent">PDF-Report herunterladen</button>' +
+          '<button id="btn-ics" class="btn">30-Tage-Erinnerung (.ics)</button>' +
+          "</div></div>" +
+        '<div class="dl-block">' +
+          '<div class="dl-head"><span class="dl-kanji" lang="ja" aria-hidden="true">共</span>' +
+          '<div><p class="dl-title">Teilen · für die Welt</p><p class="dl-sub">6 Slides im Spotify-Wrapped-Stil — dein Satz ist der Held.</p></div></div>' +
+          '<div class="dl-row">' +
+          '<button id="btn-carousel" class="btn btn-accent">Als Karussell teilen (ZIP)</button>' +
+          '<button id="btn-share-sq" class="btn">Einzel-Bild (der Satz)</button>' +
+          '<button id="btn-share-story" class="btn">Story 9:16</button>' +
+          "</div>" +
+          '<div class="share-preview"><canvas id="share-sq" class="sq" width="1080" height="1350"></canvas>' +
+          '<canvas id="share-story" class="story" width="1080" height="1920"></canvas></div>' +
+        "</div>");
 
       /* 9 · CTA */
       html += '<section class="r-section reveal"><div class="r-cta">' +
@@ -140,13 +207,12 @@
       });
 
       /* Share-Canvas vorrendern + Buttons */
-      var self = this;
       document.fonts.ready.then(function () {
-        window.IKIGAI_SHARE.renderInto(document.getElementById("share-sq"), erg, ctx, "sq");
+        window.IKIGAI_SHARE.renderInto(document.getElementById("share-sq"), erg, ctx, "card");
         window.IKIGAI_SHARE.renderInto(document.getElementById("share-story"), erg, ctx, "story");
       });
       document.getElementById("btn-share-sq").addEventListener("click", function () {
-        window.IKIGAI_SHARE.download(erg, ctx, "sq");
+        window.IKIGAI_SHARE.download(erg, ctx, "card");
       });
       document.getElementById("btn-share-story").addEventListener("click", function () {
         window.IKIGAI_SHARE.download(erg, ctx, "story");
@@ -154,6 +220,18 @@
       document.getElementById("btn-pdf").addEventListener("click", function () {
         window.IKIGAI_PDF.download(erg, ctx);
       });
+      var btnC = document.getElementById("btn-carousel");
+      if (btnC) btnC.addEventListener("click", function () {
+        window.IKIGAI_CAROUSEL.downloadZip(erg, ctx, btnC);
+      });
+      var btnI = document.getElementById("btn-ics");
+      if (btnI) btnI.addEventListener("click", function () {
+        downloadIcs(ctx);
+      });
+
+      /* Typewriter-Reveal: der Satz erscheint zuerst als Drumroll, dann öffnet
+       * sich die choreografierte Scroll-Erzählung. Letztes Reveal = der Satz. */
+      if (ctx.reveal && !ctx.fast) revealSatz(erg.zentrum);
     },
 
     scoreHtml: function (ikigai9, kommentar) {
@@ -163,10 +241,23 @@
       var dims = { e: 0, z: 0, b: 0 };
       F.ikigai9.forEach(function (item, i) { dims[item.dim] += vals[i]; });
       var C = 289, offTarget = C * (1 - sum / 45);
+      /* Vorher/Nachher-Delta: alten Score aus localStorage (ehrlicher Retention-Hebel) */
+      var deltaHtml = "";
+      try {
+        var prev = JSON.parse(localStorage.getItem("ikigai-score-history") || "null");
+        if (prev && typeof prev.sum === "number" && prev.sum !== sum) {
+          var dlt = sum - prev.sum;
+          deltaHtml = '<p class="score-delta ' + (dlt >= 0 ? "up" : "down") + '">' +
+            (dlt > 0 ? "+" + dlt : dlt) + " gegenüber deiner letzten Messung (" + prev.sum + "/45). " +
+            (dlt > 0 ? "Etwas trägt mehr als vorher." : "Ein Foto, kein Urteil — schau, was sich verschoben hat.") + "</p>";
+        }
+        localStorage.setItem("ikigai-score-history", JSON.stringify({ sum: sum, ts: Date.now() }));
+      } catch (e) {}
+      /* dickerer Datengrafik-Ring (Brief P2 / AUDIT #21) */
       return '<div class="score-row">' +
         '<div class="score-ring"><svg viewBox="0 0 100 100">' +
-        '<circle class="sr-track" cx="50" cy="50" r="46"/>' +
-        '<circle class="sr-fill" cx="50" cy="50" r="46" style="stroke-dashoffset:289" data-target="' + offTarget.toFixed(1) + '"/>' +
+        '<circle class="sr-track" cx="50" cy="50" r="44"/>' +
+        '<circle class="sr-fill" cx="50" cy="50" r="44" style="stroke-dashoffset:276" data-target="' + (276 * (1 - sum / 45)).toFixed(1) + '"/>' +
         '</svg><div class="sr-num">' + sum + '<small>von 45</small></div></div>' +
         '<div class="score-text"><p class="band">' + esc(band.label) + "</p>" +
         "<p>" + esc(band.text) + "</p>" +
@@ -174,7 +265,7 @@
         "<span>Lebensgefühl <b>" + dims.e + "/15</b></span>" +
         "<span>Blick nach vorn <b>" + dims.z + "/15</b></span>" +
         "<span>Eigene Bedeutung <b>" + dims.b + "/15</b></span>" +
-        "</div>" +
+        "</div>" + deltaHtml +
         (kommentar ? '<p style="margin-top:.7rem">' + esc(kommentar) + "</p>" : "") +
         "</div></div>" +
         '<p style="font-size:.72rem;color:var(--ink-faint);margin-top:.8rem">Skala: Ikigai-9 (Imai et al. 2012; dt. Übertragung nach Fido, Kotera &amp; Asano 2019). Kein diagnostisches Instrument.</p>';
