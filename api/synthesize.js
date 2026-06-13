@@ -115,7 +115,23 @@ const RESPONSE_SCHEMA = {
         required: ["woche", "fokus", "schritte"]
       }
     },
-    score_kommentar: { type: "STRING" }
+    score_kommentar: { type: "STRING" },
+    carousel: {
+      type: "OBJECT",
+      description: "Kuratierte, ÖFFENTLICH teilbare Verdichtung fürs Share-Karussell. Niemals Geld/Defizit/Therapie-Ton.",
+      properties: {
+        stichworte: {
+          type: "OBJECT",
+          properties: {
+            liebe: { type: "STRING" }, staerke: { type: "STRING" },
+            welt: { type: "STRING" }, markt: { type: "STRING" }
+          }
+        },
+        erkenntnis: { type: "STRING" },
+        freuden: { type: "ARRAY", items: { type: "STRING" } },
+        schritt: { type: "STRING" }
+      }
+    }
   },
   required: ["error", "zentrum", "kreise", "schnittmengen", "erkenntnisse", "ideen", "alltag", "kaizen", "score_kommentar"]
 };
@@ -140,6 +156,7 @@ FORM:
 - alltag: 3-4 Einträge. moment = wörtliche Passage aus den E-Antworten (e1-e4). saeule = Mogi-Säule 1-5 (1 Klein anfangen, 2 Sich selbst loslassen, 3 Harmonie & Nachhaltigkeit, 4 Freude an kleinen Dingen, 5 Im Hier und Jetzt sein). kommentar = 1-2 Sätze, entlastend, nie "mach mehr daraus"-Druck.
 - kaizen: GENAU 4 Wochen (woche 1-4), je GENAU 2 schritte. fokus = 2-4 Wörter. Schritte bauen aufeinander auf, Woche 1 ist die kleinste. Die Schritte müssen direkt aus den Ideen/Antworten folgen.
 - score_kommentar: 1-2 Sätze zum Ikigai-9-Ergebnis, benenne konkret das stärkste und schwächste Item. Der Wert ist ein Foto, kein Urteil.
+- carousel: die ÖFFENTLICH teilbare Verdichtung (ein Karussell, das die Person stolz posten würde). PRIVACY-FILTER, hart: KEIN Geld/Einkommen, KEINE Defizit-/Mangel-Formulierung ("dir fehlt", "du vermeidest"), KEINE Therapie-/Diagnose-Sprache, KEINE rohen Kindheits-/Angst-Antworten. stichworte = je EIN nahbares Stichwort pro Dimension (max 22 Zeichen, darf von kreise abweichen, wenn es geteilt schöner klingt). erkenntnis = die überraschendste Beobachtung als EIN Satz, Beobachtungston ("Was auffällt: …"), nie Diagnose, max 130 Zeichen. freuden = 3 kleine Freuden, je max 6 Wörter, nahbar und risikolos (aus den E-Antworten). schritt = der mutmachende erste Schritt als EIN Satz, max 90 Zeichen. Wenn etwas zu privat für ein öffentliches Bild ist, abstrahiere oder lasse es weg — niemals Rohtext zitieren.
 
 DIE PERSON:
 `;
@@ -333,6 +350,21 @@ function bereinige(erg, input) {
   for (const k of ["liebe", "staerke", "welt", "markt"]) {
     out.kreise[k] = (erg.kreise[k] || []).slice(0, 3).map(t => cut(t, 24)).filter(Boolean);
     if (out.kreise[k].length < 2) return null;
+  }
+  /* optionales carousel-Feld — abwärtskompatibel: fehlt es, leitet der Client
+   * die Slides aus dem normalen Ergebnis ab (Fallback in carousel.js) */
+  if (erg.carousel && typeof erg.carousel === "object") {
+    const c = erg.carousel, sw = c.stichworte || {};
+    const car = {
+      stichworte: {
+        liebe: cut(sw.liebe, 26), staerke: cut(sw.staerke, 26),
+        welt: cut(sw.welt, 26), markt: cut(sw.markt, 26)
+      },
+      erkenntnis: cut(c.erkenntnis, 150),
+      freuden: (Array.isArray(c.freuden) ? c.freuden : []).slice(0, 3).map(s => cut(s, 60)).filter(Boolean),
+      schritt: cut(c.schritt, 110)
+    };
+    if (car.erkenntnis || car.freuden.length || car.schritt) out.carousel = car;
   }
   if (out.erkenntnisse.length < 3 || out.ideen.length < 3 || out.kaizen.length < 4) return null;
   if (out.kaizen.some(w => w.schritte.length < 2)) return null;
